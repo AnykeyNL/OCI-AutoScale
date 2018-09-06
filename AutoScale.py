@@ -14,7 +14,7 @@ import time
 import sys
 import logging
 
-logging.basicConfig(filename="/home/opc/autoscale.log", format='%(asctime)s %(message)s', level=logging.INFO)
+logging.basicConfig(filename="~/autoscale.log", format='%(asctime)s %(message)s', level=logging.INFO)
 
 # Specify your config file with access to the OCI API credentials
 configfile = "~/config"
@@ -45,7 +45,7 @@ identity = oci.identity.IdentityClient(config)
 user = identity.get_user(config["user"]).data
 RootCompartmentID = user.compartment_id
 
-logging.debug ("Logged in as: {} @ {}".format(user.description, config["region"]))
+logging.info ("Logged in as: {} @ {}".format(user.description, config["region"]))
 
 databaseClient = oci.database.DatabaseClient(config)
 DbSystem = oci.database.models.DbSystem()
@@ -54,7 +54,7 @@ DbSystem = response.data
 
 DayOfWeek = datetime.datetime.today().weekday()
 Day = DayOfWeekString[DayOfWeek]
-logging.debug ("Day of week: {}".format(Day))
+logging.info ("Day of week: {}".format(Day))
 
 Schedule = ""
 
@@ -87,9 +87,9 @@ except:
 
 if (len(HourCoreCount) == 24):  # Check if schedule contains 24 hours.
   CurrentHour = datetime.datetime.now().hour
-  logging.debug ("Current hour: {}".format(CurrentHour))
-  logging.debug ("Current Core count:   {}".format(DbSystem.cpu_core_count))
-  logging.debug ("Scheduled Core count: {}".format(HourCoreCount[CurrentHour]))
+  logging.info ("Current hour: {}".format(CurrentHour))
+  logging.info ("Current Core count:   {}".format(DbSystem.cpu_core_count))
+  logging.info ("Scheduled Core count: {}".format(HourCoreCount[CurrentHour]))
 
   takeAction = False
   if (int(DbSystem.cpu_core_count) < int(HourCoreCount[CurrentHour]) and (action == 0 or action ==1)):
@@ -102,10 +102,10 @@ if (len(HourCoreCount) == 24):  # Check if schedule contains 24 hours.
     tries = 0
     while (tries < 5): 
       if (DbSystem.lifecycle_state == "AVAILABLE"):
-        logging.debug ("System is available for re-scaling")
+        logging.info ("System is available for re-scaling")
         DbSystemDetails = oci.database.models.UpdateDbSystemDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
         response = databaseClient.update_db_system(db_system_id = systemID, update_db_system_details = DbSystemDetails)
-        logging.debug (response.data)
+        #logging.debug (response.data)
         logging.info ("System is re-scaling")
         break
       else:
@@ -115,7 +115,7 @@ if (len(HourCoreCount) == 24):  # Check if schedule contains 24 hours.
         DbSystem = response.data
         tries = tries + 1
   else:
-    logging.debug ("No Action needed")
+    logging.info ("No Action needed")
 
 
 
