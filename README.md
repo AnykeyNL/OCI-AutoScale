@@ -27,6 +27,8 @@ The script can be run without a parameter or with the parameter "up" or "down". 
 
 I would recommend you run scaling down actions 1 or 2 minutes before the end of the hour and run scaling up actions just after the hour.
 
+![Scaling Example](https://www.oc-blog.com/wp-content/uploads/2018/09/atp_scale-1024x445.png)
+
 # More information
 Please check www.oc-blog.com
 
