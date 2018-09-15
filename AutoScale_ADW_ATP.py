@@ -1,7 +1,7 @@
 #!/opt/rh/python27/root/usr/bin/python
 # OCI - ADW and ATP Scheduled Auto Scaling
 # Written by: Richard Garsthagen - richard@oc-blog.com
-# Version 1.0 - September 14th 2018
+# Version 1.0 - September 15th 2018
 #
 # More info see: www.oc-blog.com
 #
@@ -18,7 +18,7 @@ configfile = "c:\\oci\\config"  # Define config file to be used.
 
 # #######################################################################################################
 
-def ScaleInstances(instances):
+def ScaleInstances(instances, dbtype):
   Schedule = ""
   for instance in instances:
     logging.debug(instance)
@@ -54,6 +54,7 @@ def ScaleInstances(instances):
           HourCoreCount = ""
 
         if (len(HourCoreCount) == 24):  # Check if schedule contains 24 hours.
+          logging.info ("Instance: " + instance.display_name)
           CurrentHour = datetime.datetime.now().hour
           logging.info ("Current hour: {}".format(CurrentHour))
           logging.info ("Current Core count:   {}".format(instance.cpu_core_count))
@@ -71,14 +72,19 @@ def ScaleInstances(instances):
             while (tries < 5): 
               if (instance.lifecycle_state == "AVAILABLE"):
                 logging.info ("System is available for re-scaling")
-                DbSystemDetails = oci.database.models.UpdateDbSystemDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
-                response = databaseClient.update_db_system(db_system_id = instance.id, update_db_system_details = DbSystemDetails)
+                # Let's rescale the services!
+                if dbtype == "ADW":
+                  DbSystemDetails = oci.database.models.UpdateAutonomousDataWarehouseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
+                  response = databaseClient.update_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id, update_autonomous_data_warehouse_details = DbSystemDetails)
+                if dbtype == "ATP":
+                  DbSystemDetails = oci.database.models.UpdateAutonomousDatabaseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
+                  response = databaseClient.update_autonomous_database(autonomous_database_id = instance.id, update_autonomous_database_details = DbSystemDetails)
                 logging.debug (response.data)
                 logging.info ("System is re-scaling")
                 break
               else:
                 logging.debug ("System is not available for scaling... attempt: {}".format(tries))
-                time.sleep(60)
+                time.sleep(10)
                 response = databaseClient.get_db_system(db_system_id = instance.id)
                 instance = response.data
                 tries = tries + 1
@@ -86,7 +92,7 @@ def ScaleInstances(instances):
             logging.info ("No Action needed")
 
  
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
 DayOfWeekString = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 DayOfWeek = datetime.datetime.today().weekday()
@@ -126,17 +132,17 @@ for compartment in compartments:
   compartmentName = compartment.name
   compartmentID = compartment.id
   
-  #try:
-  response = databaseClient.list_autonomous_data_warehouses(compartment_id=compartmentID)
-  ScaleInstances(response.data)
-  #except:
-  #  logging.debug ("No ADW instances")
+  try:
+    response = databaseClient.list_autonomous_data_warehouses(compartment_id=compartmentID)
+    ScaleInstances(response.data, "ADW")
+  except:
+    logging.debug ("No ADW instances")
   
-  #try:
-  response = databaseClient.list_autonomous_databases(compartment_id=compartmentID)
-  ScaleInstances(response.data)
-  #except:
-  #  logging.debug ("No ATP instances")
+  try:
+    response = databaseClient.list_autonomous_databases(compartment_id=compartmentID)
+    ScaleInstances(response.data, "ATP")
+  except:
+    logging.debug ("No ATP instances")
 
 
 
