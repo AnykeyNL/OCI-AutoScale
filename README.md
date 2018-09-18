@@ -4,9 +4,16 @@ There are 2 main Autoscaling Scripts here.
 **Autoscale;** this script is designed to run inside the Baremetal instances running the Oracle Database Cloud Service.
 **Autoscale_AWD_ATP;** this script is designed to scall ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
 
-Using pre-defined tags, you can schedule automatic scale up and down event.
+# Auto Start and Stop
+As the ATP and ADW services also support turning an instance on and off (and reducing cost), the AWD_ATP script supports this now.
+If you specify and 0 (zero) for the hour, it will stop the service. If the services is stopped and the hour requires more then 0 cpu
+cores, it will automatically start the instance and then scale it to the appropriate size.
+
+As the starting takes some time, I have updated the ADW_ATP script with support for multi threading, so that all scaling actions happen at the same time, and not sequencially.
 
 # How to use
+Using pre-defined tags, you can schedule automatic scale up and down event.
+
 Created a Tag Namespace called "Schedule"
 In that namespace create the following Tag Key Definitions:
 - AnyDay

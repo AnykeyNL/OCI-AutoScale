@@ -1,7 +1,6 @@
-#!/opt/rh/python27/root/usr/bin/python
 # OCI - ADW and ATP Scheduled Auto Scaling
 # Written by: Richard Garsthagen - richard@oc-blog.com
-# Version 1.0 - September 15th 2018
+# Version 1.1 - September 18th 2018
 #
 # More info see: www.oc-blog.com
 #
@@ -11,21 +10,22 @@ import logging
 import datetime
 import time
 import sys
+from threading import Thread
 
-# Script configuation ###################################################################################
+
+# Script configuation ##################################################################################
 
 configfile = "c:\\oci\\config"  # Define config file to be used. 
 
-# #######################################################################################################
+########################################################################################################
 
-def ScaleInstances(instances, dbtype):
-  Schedule = ""
-  for instance in instances:
+def ScaleInstance(instance, dbtype):
+    Schedule = ""
     logging.debug(instance)
     for def_tags in instance.defined_tags:
       logging.debug(def_tags)
       if (def_tags == "Schedule"):
-        logging.debug ("Schedule tags found for instance " + instance.display_name)
+        logging.info ("Schedule tags found for instance " + instance.display_name)
         schedTags = instance.defined_tags["Schedule"]
         try:
           Schedule = schedTags["AnyDay"]
@@ -69,25 +69,66 @@ def ScaleInstances(instances, dbtype):
           if (takeAction):
             logging.info ("System needs to rescaling")
             tries = 0
-            while (tries < 5): 
+            while (tries < 7): 
               if (instance.lifecycle_state == "AVAILABLE"):
-                logging.info ("System is available for re-scaling")
+                logging.debug ("System is available for re-scaling")
                 # Let's rescale the services!
                 if dbtype == "ADW":
-                  DbSystemDetails = oci.database.models.UpdateAutonomousDataWarehouseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
-                  response = databaseClient.update_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id, update_autonomous_data_warehouse_details = DbSystemDetails)
+                  if int(HourCoreCount[CurrentHour]) == 0:
+                    response = databaseClient.stop_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id)
+                    logging.info("Stopping ADW as requested CPU count is 0")
+                  else:
+                    DbSystemDetails = oci.database.models.UpdateAutonomousDataWarehouseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
+                    response = databaseClient.update_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id, update_autonomous_data_warehouse_details = DbSystemDetails)
                 if dbtype == "ATP":
-                  DbSystemDetails = oci.database.models.UpdateAutonomousDatabaseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
-                  response = databaseClient.update_autonomous_database(autonomous_database_id = instance.id, update_autonomous_database_details = DbSystemDetails)
+                  if int(HourCoreCount[CurrentHour]) == 0:
+                    response = databaseClient.stop_autonomous_database(autonomous_database_id = instance.id)
+                    logging.info("Stopping ATP as requested CPU count is 0")
+                  else:
+                    DbSystemDetails = oci.database.models.UpdateAutonomousDatabaseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
+                    response = databaseClient.update_autonomous_database(autonomous_database_id = instance.id, update_autonomous_database_details = DbSystemDetails)
                 logging.debug (response.data)
                 logging.info ("System is re-scaling")
                 break
+
+              elif (instance.lifecycle_state == "STOPPED"):
+                logging.debug("System is stopped!")
+                if dbtype == "ADW":
+                  if int(HourCoreCount[CurrentHour]) != 0:
+                    logging.info("Need to power on ADW instance first")
+                    response = databaseClient.start_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id)
+                    if (int(instance.cpu_core_count) < int(HourCoreCount[CurrentHour])):
+                      while (instance.lifecycle_state != "AVAILABLE"):
+                        logging.debug("Waiting for instance to become available")
+                        response = databaseClient.get_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id)
+                        instance = response.data
+                        time.sleep(5)
+                      DbSystemDetails = oci.database.models.UpdateAutonomousDataWarehouseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
+                      response = databaseClient.update_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id, update_autonomous_data_warehouse_details = DbSystemDetails)
+                if dbtype == "ATP":
+                  if int(HourCoreCount[CurrentHour]) != 0:
+                    logging.info("Need to power on ATP instance first")
+                    response = databaseClient.start_autonomous_database(autonomous_database_id = instance.id)
+                    if (int(instance.cpu_core_count) < int(HourCoreCount[CurrentHour])):
+                      while (instance.lifecycle_state != "AVAILABLE"):
+                        logging.debug("Waiting for instance to become available")
+                        response = databaseClient.get_autonomous_database(autonomous_database_id = instance.id)
+                        instance = response.data
+                        time.sleep(5)
+                      DbSystemDetails = oci.database.models.UpdateAutonomousDatabaseDetails(cpu_core_count = int(HourCoreCount[CurrentHour]))
+                      response = databaseClient.update_autonomous_database(autonomous_database_id = instance.id, update_autonomous_database_details = DbSystemDetails)
+                break
+
               else:
                 logging.debug ("System is not available for scaling... attempt: {}".format(tries))
-                time.sleep(10)
-                response = databaseClient.get_db_system(db_system_id = instance.id)
+                time.sleep(20)
+                if (dbtype == "ADW"):
+                  response = databaseClient.get_autonomous_data_warehouse(autonomous_data_warehouse_id = instance.id)
+                if (dbtype == "ATP"):
+                  response = databaseClient.get_autonomous_database(autonomous_database_id = instance.id)
                 instance = response.data
                 tries = tries + 1
+        
           else:
             logging.info ("No Action needed")
 
@@ -128,21 +169,42 @@ RootCompartment.id = RootCompartmentID
 RootCompartment.name = "root"
 compartments.insert(0, RootCompartment)
 
+threads = []
+
 for compartment in compartments:
   compartmentName = compartment.name
   compartmentID = compartment.id
   
   try:
     response = databaseClient.list_autonomous_data_warehouses(compartment_id=compartmentID)
-    ScaleInstances(response.data, "ADW")
+    instances = response.data
+    for instance in instances:
+      t = Thread( target=ScaleInstance, args=(instance, "ADW") )
+      threads.append(t)
   except:
     logging.debug ("No ADW instances")
   
   try:
     response = databaseClient.list_autonomous_databases(compartment_id=compartmentID)
-    ScaleInstances(response.data, "ATP")
+    instances = response.data
+    for instance in instances:
+      t = Thread( target=ScaleInstance, args =(instance, "ATP") )
+      threads.append(t)
   except:
     logging.debug ("No ATP instances")
+
+logging.debug("Start scaling threads")
+for s in threads:
+  s.start()
+
+logging.debug("Waiting for completion of all threads")
+for s in threads:
+  s.join()
+
+logging.info("Completed")
+
+
+
 
 
 
