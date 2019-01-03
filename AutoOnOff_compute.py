@@ -7,7 +7,7 @@
 # - AnyDay
 # - Weekend
 # - Weekday
-# - Monday, Tuesday, Wednessday, Thursday, Friday, Saturday, Sunday
+# - Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
 #
 # Each tag must consist of 24 numbers seperated by a komma, representing the hours of the day.
 # a 0 stands for OFF and a 1 stands for ON
@@ -33,10 +33,10 @@ action = 0
 
 for arg in sys.argv:
   if arg == "on": 
-    logging.info ("Check for auto ON events")
+    logging.info ("Check for auto ON events ONLY")
     action = 1
   if arg == "off":
-    logging.info ("Check for auto OFF events")
+    logging.info ("Check for auto OFF events ONLY")
     action = 2
 
 def CheckInstances(instances, compartmentName, regionname):
@@ -62,10 +62,10 @@ def CheckInstances(instances, compartmentName, regionname):
         schedulehours = schedule.split(",")
         if len(schedulehours) == 24:
             logging.info ("Current State: [{}]  -   Desired state: [{}]".format(instance.lifecycle_state, schedulehours[CurrentHour-1]))
-            if instance.lifecycle_state == "STOPPED" and schedulehours[CurrentHour-1] == "1":
+            if instance.lifecycle_state == "STOPPED" and schedulehours[CurrentHour-1] == "1" and (action == 0 or action== 1):
                 logging.info("Starting the instance")
                 response = ComputeClient.instance_action(instance_id=instance.id, action="START")
-            if instance.lifecycle_state == "RUNNING" and schedulehours[CurrentHour-1] == "0":
+            if instance.lifecycle_state == "RUNNING" and schedulehours[CurrentHour-1] == "0" and (action == 0 or action== 2):
                 logging.info("Stopping the instance")
                 response = ComputeClient.instance_action(instance_id=instance.id, action="SOFTSTOP")
                 
