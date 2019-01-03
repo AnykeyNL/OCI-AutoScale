@@ -1,10 +1,6 @@
 [DEFAULT]
-
 user=ocid1.user.oc1..xxxxxxxxxxxxxxxxxxxx
 fingerprint=xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx
-
 key_file=/oci/privatekey.pem
-
 tenancy=ocid1.tenancy.oc1..xxxxxxxxxxxxxxxxxxxxxx
-
 region=eu-frankfurt-1
