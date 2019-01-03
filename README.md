@@ -1,8 +1,11 @@
 # OCI-AutoScale
-There are 2 main Autoscaling Scripts here.
+There are 3 main Autoscaling Scripts here.
 
 **Autoscale;** this script is designed to run inside the Baremetal instances running the Oracle Database Cloud Service.
+
 **Autoscale_AWD_ATP;** this script is designed to scall ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
+
+**AutoOnOff;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
 
 # Auto Start and Stop
 As the ATP and ADW services also support turning an instance on and off (and reducing cost), the AWD_ATP script supports this now.
@@ -30,7 +33,7 @@ In that namespace create the following Tag Key Definitions:
 After that you can add the takes to any database instance you want to Autoscale based on a schedule. The tag should contain 24 numbers, sperated by commas. Each number represents the amount of CPUs for that specific hour.
 
 # Running the Scripts
-The script can be run without a parameter or with the parameter "up" or "down". If the "up" parameter is specified the script will only execute scaling Up actions. If "down" is specified, it will only do scaling Down actions. If nothing is specified, the script will do BOTH scaling up and down actions.
+The script can be run without a parameter or with the parameter "up/down" or "on/off". If the "up/on" parameter is specified the script will only execute scaling Up / Power on actions. If "down/off" is specified, it will only do scaling Down and power off actions. If nothing is specified, the script will do BOTH scaling and power actions.
 
 I would recommend you run scaling down actions 1 or 2 minutes before the end of the hour and run scaling up actions just after the hour.
 
