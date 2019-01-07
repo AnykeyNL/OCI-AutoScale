@@ -5,7 +5,7 @@ There are 3 main Autoscaling Scripts here.
 
 **Autoscale_AWD_ATP;** this script is designed to scall ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
 
-**AutoOnOff;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
+**AutoOnOff_compute;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
 
 # Auto Start and Stop
 As the ATP and ADW services also support turning an instance on and off (and reducing cost), the AWD_ATP script supports this now.
