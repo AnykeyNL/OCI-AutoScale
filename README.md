@@ -43,3 +43,7 @@ I would recommend you run scaling down actions 1 or 2 minutes before the end of 
 Please check www.oc-blog.com
 
 Demo video: https://youtu.be/5jsGgfClPAM
+
+
+## Disclaimer
+This is a personal repositorie. Any code, views or opinions represented here are personal and belong solely to me and do not represent those of people, institutions or organizations that I may or may not be associated with in professional or personal capacity, unless explicitly stated.
