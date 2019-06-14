@@ -20,7 +20,7 @@ Using pre-defined tags, you can schedule automatic scale up and down event.
 Created a Tag Namespace called "Schedule"
 In that namespace create the following Tag Key Definitions:
 - AnyDay
-- WeekDay
+- Weekday
 - Weekend
 - Monday
 - Tuesday
