@@ -33,9 +33,9 @@ just before the end of the hour and run power on and scale up operations just af
 To ensure the script runs as fast as possible, all blocking operations (power on, wait to be available and then re-scale) are executed in a seperate thread. I would recommend you run scaling down actions 1 or 2 minutes before the end of the hour and run scaling up actions just after the hour.
 
 # Single service Autoscaling Scripts:
--**AutoscaleDBBM;** this script is designed to run inside the Baremetal instances running the Oracle Database Cloud Service.
--**Autoscale_AWD_ATP;** this script is designed to scale ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise. When 0 is specified the service will be turned off.
--**AutoScaleCompute;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
+- **AutoscaleDBBM;** this script is designed to run inside the Baremetal instances running the Oracle Database Cloud Service.
+- **Autoscale_AWD_ATP;** this script is designed to scale ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise. When 0 is specified the service will be turned off.
+- **AutoScaleCompute;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
 
 
 # More information
