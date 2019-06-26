@@ -20,7 +20,7 @@ WeekDay = "WeekDay"
 Daysofweek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 # OCI Configuration
-configfile = "~/.oci/config_oractdemeaoci"
+configfile = "~/.oci/config"
 ComputeShutdownMethod = "SOFTSTOP"
 
 # Configure logging output
