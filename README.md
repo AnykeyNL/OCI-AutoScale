@@ -19,7 +19,7 @@ A single resource can contain multiple tags. A Weekend/Weekday tag overrules an 
 
 The value of the tag needs to contain 24 numbers (else it is ignored), seperated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
 
-![Scaling Example](https://www.oc-blog.com/wp-content/uploads/2018/09/atp_scale-1024x445.png)
+![Scaling Example](http://oc-blog.com/wp-content/uploads/2019/06/Scale-example.png)
 
 The script supports 3 running methods: All, Up, Down
 
