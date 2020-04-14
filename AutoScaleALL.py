@@ -1,3 +1,4 @@
+#!/home/opc/py36env/bin/python
 import oci
 import logging
 import datetime
@@ -138,7 +139,9 @@ for c in compartments:
 
 # All the items with a schedule are now collected.
 # Let's go thru them and find / validate the correct schedule
-
+total_resources = len(result.items)
+success=[]
+errors=[]
 for resource in result.items:
     schedule = resource.defined_tags[PredefinedTag]
     ActiveSchedule = ""
@@ -150,17 +153,21 @@ for resource in result.items:
     else:
         if Weekend in schedule:
             ActiveSchedule = schedule[Weekend]
-    if Day in schedule: # Check for day specific tag (today)
-        ActiveSchedule = schedule[Day]
+        if Day in schedule: # Check for day specific tag (today)
+            ActiveSchedule = schedule[Day]
 
     # Check is the active schedule contains exactly 24 numbers for each hour of the day
     try:
         schedulehours = ActiveSchedule.split(",")
+        logging.info(ActiveSchedule)
+        logging.info(schedulehours)
         if len(schedulehours) != 24:
+            errors.append("Error with schedule of {} - {}, not correct amount of hours")
             logging.error("Error with schedule of {} - {}, not correct amount of hours".format(resource.display_name, ActiveSchedule))
             ActiveSchedule = ""
     except:
         ActiveSchedule = ""
+        errors.append("Error with schedule for {}".format(resource.display_name))
         logging.error("Error with schedule of {}".format(resource.display_name))
 
     # if schedule validated, let see if we can apply the new schedule to the resource
@@ -176,10 +183,12 @@ for resource in result.items:
                 if resourceDetails.shape[:2] == "VM":
                     if resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) == 0:
                         if Action == "All" or Action == "Down":
+                            success.append("Initiate Compute VM shutdown for {}".format(resource.display_name))
                             logging.info("Initiate Compute VM shutdown for {}".format(resource.display_name))
                             response = compute.instance_action(instance_id=resource.identifier, action=ComputeShutdownMethod)
                     if resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
                         if Action == "All" or Action == "Up":
+                            success.append("Initiate Compute VM startup for {}".format(resource.display_name))
                             logging.info("Initiate Compute VM startup for {}".format(resource.display_name))
                             response = compute.instance_action(instance_id=resource.identifier, action="START")
 
@@ -193,10 +202,12 @@ for resource in result.items:
                 if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
                     if dbnodedetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) == 0:
                         if Action == "All" or Action == "Down":
+                            success.append("Initiate DB VM shutdown for {}".format(resource.display_name))
                             logging.info("Initiate DB VM shutdown for {}".format(resource.display_name))
                             response = database.db_node_action(db_node_id=dbnodedetails.id, action="STOP")
                     if dbnodedetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
                         if Action == "All" or Action == "Up":
+                            success.append("Initiate DB VM startup for {}".format(resource.display_name))
                             logging.info("Initiate DB VM startup for {}".format(resource.display_name))
                             response = database.db_node_action(db_node_id=dbnodedetails.id, action="START")
 
@@ -205,12 +216,14 @@ for resource in result.items:
                 if int(schedulehours[CurrentHour]) > 1 and int(schedulehours[CurrentHour]) < 53:
                     if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Down":
+                            success.append("Initiate DB BM Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             logging.info("Initiate DB BM Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             dbupdate = oci.database.models.UpdateDbSystemDetails()
                             dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
                             response = database.update_db_system(db_system_id=resource.identifier, update_db_system_details=dbupdate)
                     if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Up":
+                            success.append("Initiate DB BM Scale UP to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             logging.info("Initiate DB BM Scale UP to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             dbupdate = oci.database.models.UpdateDbSystemDetails()
                             dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
@@ -226,6 +239,7 @@ for resource in result.items:
                 if resourceDetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) > 0:
                     if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Down":
+                            success.append("Initiate Autonomous DB Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             logging.info("Initiate Autonomous DB Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),
                                                                                          resource.display_name))
                             dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
@@ -234,6 +248,7 @@ for resource in result.items:
 
                     if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Up":
+                            success.append("Initiate Autonomous DB Scale Up to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             logging.info("Initiate Autonomous DB Scale Up to {} for {}".format(int(schedulehours[CurrentHour]),
                                                                                                  resource.display_name))
                             dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
@@ -266,13 +281,15 @@ for resource in result.items:
             # Stop Resource pool action
             if resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) == 0:
                 if Action == "All" or Action == "Down":
+                    success.append("Stopping instance pool {}".format(resource.display_name))
                     logging.info("Stopping instance pool {}".format(resource.display_name))
                     response = pool.stop_instance_pool(instance_pool_id=resource.identifier)
 
             # Scale up action on running instance pool
             elif resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) > resourceDetails.size:
                 if Action == "All" or Action == "Up":
-                    logging.info("Scaling up instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour]) ))
+                    success.append("Scaling up instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
+                    logging.info("Scaling up instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
                     pooldetails = oci.core.models.UpdateInstancePoolDetails()
                     pooldetails.size = int(schedulehours[CurrentHour])
                     response = pool.update_instance_pool(instance_pool_id=resource.identifier, update_instance_pool_details=pooldetails).data
@@ -280,6 +297,7 @@ for resource in result.items:
             # Scale down action on running instance pool
             elif resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) < resourceDetails.size:
                 if Action == "All" or Action == "Down":
+                    success.append("Scaling down instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
                     logging.info("Scaling down instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour]) ))
                     pooldetails = oci.core.models.UpdateInstancePoolDetails()
                     pooldetails.size = int(schedulehours[CurrentHour])
@@ -289,6 +307,7 @@ for resource in result.items:
                 if Action == "All" or Action == "Up":
                     # Start instance pool with same amount of instances as configured
                     if resourceDetails.size == int(schedulehours[CurrentHour]):
+                        success.append("Starting instance pool {} from stopped state".format(resource.display_name))
                         logging.info("Starting instance pool {} from stopped state".format(resource.display_name))
                         response = pool.start_instance_pool(instance_pool_id=resource.identifier).data
 
@@ -304,27 +323,13 @@ for resource in result.items:
 for t in threads:
    t.join()
 
+if config.get("topic"):
+    ns = oci.ons.NotificationDataPlaneClient(config)
+    body_message = "Scaling ({}) just completed. Found {} errors across {} scaleable instances (from a total of {} instances). \nError Details: {}\n\nSuccess Details: {}".format(Action, len(errors),len(success),total_resources,errors,success)
+
+    ns.publish_message(config["topic"], {
+        "title": "Scaling Script ran across tenancy: {}".format(config["tenancy"]),
+        "body": body_message
+    })
+
 print ("All scaling tasks done")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
