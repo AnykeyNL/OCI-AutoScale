@@ -40,11 +40,6 @@ To ensure the script runs as fast as possible, all blocking operations (power on
 
 You can deploy this script anywhere you like as long as the location has internet access to the OCI API services. 
 
-# Single service Autoscaling Scripts:
-- **AutoscaleDBBM;** this script is designed to run inside the Baremetal instances running the Oracle Database Cloud Service and Schedule itself up/down based on the schedule.
-- **Autoscale_AWD_ATP;** this script is designed to scale ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise. When 0 is specified the service will be turned off.
-- **AutoScaleCompute;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
-
 # More information
 Please check www.oc-blog.com
 
