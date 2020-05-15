@@ -201,7 +201,7 @@ for resource in result.items:
     ActiveSchedule = ""
     if AnyDay in schedule:
         ActiveSchedule = schedule[AnyDay]
-    if DayOfWeek < 6 : #check for weekday / weekend
+    if DayOfWeek < 5 : #check for weekday / weekend
         if WeekDay in schedule:
             ActiveSchedule = schedule[WeekDay]
     else:
