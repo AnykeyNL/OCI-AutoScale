@@ -2,7 +2,7 @@
 # OCI - Scheduled Auto Scaling Script
 # Written by: Richard Garsthagen - richard@oc-blog.com
 # Co-Developers: Joel Nation (https://github.com/Joelith)
-# Version 2.0 - April 20200
+# Version 2.1 - May 20200
 #
 # More info see: www.oc-blog.com
 #
@@ -30,8 +30,13 @@ UseInstancePrinciple = False
 configfile = "~/.oci/config"
 
 ComputeShutdownMethod = "SOFTSTOP"
+LogLevel = "ALL" #  Use ALL or ERRORS. When set to ERRORS only a notification will be published if error occurs
 TopicID = ""  # Enter Topic OCID if you want the script to publish a message about the scaling actions
+
+RateLimitDelay = 2  # Time in seconds to wait before retry of operation
 # ============================================================
+
+ErrorsFound = False
 
 # Configure logging output
 def MakeLog(msg):
@@ -62,14 +67,40 @@ class AutonomousThread (threading.Thread):
         self.CPU = CPU
     def run(self):
         MakeLog("Starting Autonomous DB {} and after that scaling to {} cpus".format(self.NAME, self.CPU) )
-        response = database.start_autonomous_database(autonomous_database_id=self.ID).data
-        while response.lifecycle_state != "AVAILABLE":
-            response = database.get_autonomous_database(autonomous_database_id=self.ID).data
-            time.sleep(5)
+        Retry = True
+        while Retry:
+            try:
+                response = database.start_autonomous_database(autonomous_database_id=self.ID)
+                Retry = False
+                success.append("Started Autonomous DB {}".format(self.NAME))
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    ErrorsFound = True
+                    errors.append("Error ({}) Starting Autonomous DB {}".format(response.status, self.NAME))
+                    Retry = False
+
+        while response.data.lifecycle_state != "AVAILABLE":
+            response = database.get_autonomous_database(autonomous_database_id=self.ID)
+            time.sleep(10)
         MakeLog("Autonomous DB {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
         dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
         dbupdate.cpu_core_count = self.CPU
-        response = database.update_autonomous_database(autonomous_database_id=self.ID, update_autonomous_database_details=dbupdate)
+        Retry = True
+        while Retry:
+            try:
+                response = database.update_autonomous_database(autonomous_database_id=self.ID, update_autonomous_database_details=dbupdate)
+                Retry = False
+                success.append("Autonomous DB {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    errors.append("Error ({}) re-scaling to {} cpus for {}".format(response.status, self.CPU, self.NAME))
+                    Retry = False
 
 class PoolThread (threading.Thread):
     def __init__(self, threadID, ID, NAME, INSTANCES):
@@ -80,14 +111,40 @@ class PoolThread (threading.Thread):
         self.INSTANCES = INSTANCES
     def run(self):
         MakeLog("Starting Instance Pool {} and after that scaling to {} instances".format(self.NAME, self.INSTANCES) )
-        response = pool.start_instance_pool(instance_pool_id=self.ID).data
-        while response.lifecycle_state != "RUNNING":
-            response = pool.get_instance_pool(instance_pool_id=self.ID).data
-            time.sleep(5)
+        Retry = True
+        while Retry:
+            try:
+                response = pool.start_instance_pool(instance_pool_id=self.ID)
+                Retry = False
+                success.append("Starting Instance Pool {}".format(self.NAME))
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    errors.append("Error ({}) starting instance pool {}".format(response.status, self.NAME))
+                    Retry = False
+
+        while response.data.lifecycle_state != "RUNNING":
+            response = pool.get_instance_pool(instance_pool_id=self.ID)
+            time.sleep(10)
         MakeLog("Instance pool {} started, re-scaling to {} instances".format(self.NAME, self.INSTANCES))
         pooldetails = oci.core.models.UpdateInstancePoolDetails()
         pooldetails.size = self.INSTANCES
-        response = pool.update_instance_pool(instance_pool_id=self.ID, update_instance_pool_details=pooldetails).data
+        Retry = True
+        while Retry:
+            try:
+                response = pool.update_instance_pool(instance_pool_id=self.ID, update_instance_pool_details=pooldetails)
+                Retry = False
+                success.append("Rescaling Instance Pool {} to {} instances".format(self.NAME, self.INSTANCES))
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    ErrorsFound = True
+                    errors.append("Error ({}) rescaling instance pool {}".format(response.status, self.NAME))
+                    Retry = False
 
 if UseInstancePrinciple:
     userName = "Instance Principle"
@@ -161,7 +218,7 @@ MakeLog ("Day of week: {} - Current hour: {}".format(Day,CurrentHour))
 CurrentHour = CurrentHour -1
 
 
-# Find (almost) all resources with a Schedule Tag
+# Find all resources with a Schedule Tag
 query = "query all resources where (definedTags.namespace = '{}')".format(PredefinedTag)
 
 sdetails = oci.resource_search.models.StructuredSearchDetails()
@@ -169,34 +226,13 @@ sdetails.query = query
 
 result = search.search_resources(search_details=sdetails, limit=1000).data
 
-# Manually searching for Instance Pools as this is not indexed by the search function
-compartments = oci.pagination.list_call_get_all_results(identity.list_compartments, compartment_id=RootCompartmentID ,compartment_id_in_subtree= True).data
-
-
-for c in compartments:
-    if c.lifecycle_state == "ACTIVE":
-        #pools = oci.pagination.list_call_get_all_results(pool.list_instance_pools, compartment_id=c.id).data
-        pools = pool.list_instance_pools(compartment_id=c.id).data
-        for p in pools:
-            # If Schedule tag is found in the instance pool, add the pool to the search results.
-            if PredefinedTag in p.defined_tags:
-                pdetail = oci.resource_search.models.ResourceSummary()
-                pdetail.identifier = p.id
-                pdetail.resource_type = "instancePool"
-                pdetail.defined_tags = p.defined_tags
-                pdetail.display_name = p.display_name
-                pdetail.lifecycle_state = p.lifecycle_state
-                pdetail.time_created = p.time_created
-                pdetail.compartment_id = p.compartment_id
-                result.items.append(pdetail)
-
-
 # All the items with a schedule are now collected.
 # Let's go thru them and find / validate the correct schedule
 total_resources = len(result.items)
 success=[]
 errors=[]
 for resource in result.items:
+    MakeLog ("Checking: {} - {}".format(resource.display_name, resource.resource_type))
     schedule = resource.defined_tags[PredefinedTag]
     ActiveSchedule = ""
     if AnyDay in schedule:
@@ -213,16 +249,18 @@ for resource in result.items:
     # Check is the active schedule contains exactly 24 numbers for each hour of the day
     try:
         schedulehours = ActiveSchedule.split(",")
-        MakeLog(ActiveSchedule)
-        MakeLog(schedulehours)
+        #MakeLog(ActiveSchedule)
+        #MakeLog(schedulehours)
         if len(schedulehours) != 24:
+            ErrorsFound = True
             errors.append("Error with schedule of {} - {}, not correct amount of hours")
-            logging.error("Error with schedule of {} - {}, not correct amount of hours".format(resource.display_name, ActiveSchedule))
+            MakeLog("Error with schedule of {} - {}, not correct amount of hours".format(resource.display_name, ActiveSchedule))
             ActiveSchedule = ""
     except:
+        ErrorsFound = True
         ActiveSchedule = ""
         errors.append("Error with schedule for {}".format(resource.display_name))
-        logging.error("Error with schedule of {}".format(resource.display_name))
+        MakeLog("Error with schedule of {}".format(resource.display_name))
 
     # if schedule validated, let see if we can apply the new schedule to the resource
     if ActiveSchedule != "":
@@ -237,15 +275,40 @@ for resource in result.items:
                 if resourceDetails.shape[:2] == "VM":
                     if resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) == 0:
                         if Action == "All" or Action == "Down":
-                            success.append("Initiate Compute VM shutdown for {}".format(resource.display_name))
                             MakeLog("Initiate Compute VM shutdown for {}".format(resource.display_name))
-                            response = compute.instance_action(instance_id=resource.identifier, action=ComputeShutdownMethod)
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = compute.instance_action(instance_id=resource.identifier, action=ComputeShutdownMethod)
+                                    Retry = False
+                                    success.append("Initiate Compute VM shutdown for {}".format(resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) Compute VM Shutdown for {}".format(response.status, resource.display_name))
+                                        MakeLog("Error ({}) Compute VM Shutdown for {}".format(response.status, resource.display_name))
+                                        Retry = False
+
                     if resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
                         if Action == "All" or Action == "Up":
-                            success.append("Initiate Compute VM startup for {}".format(resource.display_name))
                             MakeLog("Initiate Compute VM startup for {}".format(resource.display_name))
-                            response = compute.instance_action(instance_id=resource.identifier, action="START")
-
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = compute.instance_action(instance_id=resource.identifier, action="START")
+                                    Retry = False
+                                    success.append("Initiate Compute VM startup for {}".format(resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) Compute VM startup for {}".format(response.status, resource.display_name))
+                                        Retry = False
 
         if resource.resource_type == "DbSystem":
             resourceDetails = database.get_db_system(db_system_id=resource.identifier).data
@@ -256,33 +319,81 @@ for resource in result.items:
                 if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
                     if dbnodedetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) == 0:
                         if Action == "All" or Action == "Down":
-                            success.append("Initiate DB VM shutdown for {}".format(resource.display_name))
                             MakeLog("Initiate DB VM shutdown for {}".format(resource.display_name))
-                            response = database.db_node_action(db_node_id=dbnodedetails.id, action="STOP")
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.db_node_action(db_node_id=dbnodedetails.id, action="STOP")
+                                    Retry = False
+                                    success.append("Initiate DB VM shutdown for {}".format(resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) DB VM shutdown for {}".format(response.status, resource.display_name))
+                                        Retry = False
                     if dbnodedetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
                         if Action == "All" or Action == "Up":
-                            success.append("Initiate DB VM startup for {}".format(resource.display_name))
                             MakeLog("Initiate DB VM startup for {}".format(resource.display_name))
-                            response = database.db_node_action(db_node_id=dbnodedetails.id, action="START")
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.db_node_action(db_node_id=dbnodedetails.id, action="START")
+                                    Retry = False
+                                    success.append("Initiate DB VM startup for {}".format(resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) DB VM startup for {}".format(response.status, resource.display_name))
+                                        Retry = False
 
             # Execute CPU Scale Up/Down operations for Database BMs
             if resourceDetails.shape[:2] == "BM":
                 if int(schedulehours[CurrentHour]) > 1 and int(schedulehours[CurrentHour]) < 53:
                     if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Down":
-                            success.append("Initiate DB BM Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             MakeLog("Initiate DB BM Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             dbupdate = oci.database.models.UpdateDbSystemDetails()
                             dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
-                            response = database.update_db_system(db_system_id=resource.identifier, update_db_system_details=dbupdate)
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.update_db_system(db_system_id=resource.identifier, update_db_system_details=dbupdate)
+                                    Retry = False
+                                    success.append("Initiate DB BM Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) DB BM Scale Down to {} for {}".format(response.status, int(schedulehours[CurrentHour]),resource.display_name))
+                                        Retry = False
+
                     if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Up":
-                            success.append("Initiate DB BM Scale UP to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             MakeLog("Initiate DB BM Scale UP to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             dbupdate = oci.database.models.UpdateDbSystemDetails()
                             dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
-                            response = database.update_db_system(db_system_id=resource.identifier, update_db_system_details=dbupdate)
-
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.update_db_system(db_system_id=resource.identifier, update_db_system_details=dbupdate)
+                                    Retry = False
+                                    success.append("Initiate DB BM Scale UP to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) DB BM Scale UP to {} for {}".format(response.status, int(schedulehours[CurrentHour]),resource.display_name))
+                                        Retry = False
 
         # Execute CPU Scale Up/Down operations for Database BMs
         if resource.resource_type == "AutonomousDatabase":
@@ -293,34 +404,86 @@ for resource in result.items:
                 if resourceDetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) > 0:
                     if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Down":
-                            success.append("Initiate Autonomous DB Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             MakeLog("Initiate Autonomous DB Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),
                                                                                          resource.display_name))
                             dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
                             dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
-                            response = database.update_autonomous_database(autonomous_database_id=resource.identifier, update_autonomous_database_details=dbupdate)
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.update_autonomous_database(autonomous_database_id=resource.identifier, update_autonomous_database_details=dbupdate)
+                                    Retry = False
+                                    success.append("Initiate Autonomous DB Scale Down to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) Autonomous DB Scale Down to {} for {}".format(response.status, int(schedulehours[CurrentHour]),resource.display_name))
+                                        Retry = False
 
                     if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
                         if Action == "All" or Action == "Up":
-                            success.append("Initiate Autonomous DB Scale Up to {} for {}".format(int(schedulehours[CurrentHour]),resource.display_name))
                             MakeLog("Initiate Autonomous DB Scale Up to {} for {}".format(int(schedulehours[CurrentHour]),
                                                                                                  resource.display_name))
                             dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
                             dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
-                            response = database.update_autonomous_database(autonomous_database_id=resource.identifier,
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.update_autonomous_database(autonomous_database_id=resource.identifier,
                                                                            update_autonomous_database_details=dbupdate)
+                                    Retry = False
+                                    success.append("Initiate Autonomous DB Scale Up to {} for {}".format(
+                                        int(schedulehours[CurrentHour]), resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) Autonomous DB Scale Up to {} for {}".format(response.status, int(schedulehours[CurrentHour]), resource.display_name))
+                                        Retry = False
 
                 # Autonomous DB is running request is to stop the database
                 if resourceDetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) == 0:
                     if Action == "All" or Action == "Down":
-                        response= database.stop_autonomous_database(autonomous_database_id=resource.identifier)
+                        MakeLog("Stoping Autonomous DB {}".format(resource.display_name))
+                        Retry = True
+                        while Retry:
+                            try:
+                                response= database.stop_autonomous_database(autonomous_database_id=resource.identifier)
+                                Retry = False
+                                success.append("Initiate Autonomous DB Shutdown for {}".format(resource.display_name))
+                            except oci.exceptions.ServiceError as response:
+                                if response.status == 429:
+                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                    time.sleep(RateLimitDelay)
+                                else:
+                                    ErrorsFound = True
+                                    errors.append("Error ({}) Autonomous DB Shutdown for {}".format(response.status, resource.display_name))
+                                    Retry = False
 
                 if resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) > 0:
                     if Action == "All" or Action == "Up":
-
                         # Autonomous DB is stopped and needs to be started with same amount of CPUs configured
                         if resourceDetails.cpu_core_count == int(schedulehours[CurrentHour]):
-                            response = database.start_autonomous_database(autonomous_database_id=resource.identifier)
+                            MakeLog("Starting Autonomous DB {}".format(resource.display_name))
+                            Retry = True
+                            while Retry:
+                                try:
+                                    response = database.start_autonomous_database(autonomous_database_id=resource.identifier)
+                                    Retry = False
+                                    success.append("Initiate Autonomous DB Startup for {}".format(resource.display_name))
+                                except oci.exceptions.ServiceError as response:
+                                    if response.status == 429:
+                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                        time.sleep(RateLimitDelay)
+                                    else:
+                                        ErrorsFound = True
+                                        errors.append("Error ({}) Autonomous DB Startup for {}".format(response.status,resource.display_name))
+                                        Retry = False
 
                         # Autonomous DB is stopped and needs to be started, after that it requires CPU change
                         if resourceDetails.cpu_core_count != int(schedulehours[CurrentHour]):
@@ -329,7 +492,7 @@ for resource in result.items:
                             thread.start()
                             threads.append(thread)
 
-        if resource.resource_type == "instancePool":
+        if resource.resource_type == "InstancePool":
             resourceDetails = pool.get_instance_pool(instance_pool_id=resource.identifier).data
 
             # Stop Resource pool action
@@ -337,25 +500,62 @@ for resource in result.items:
                 if Action == "All" or Action == "Down":
                     success.append("Stopping instance pool {}".format(resource.display_name))
                     MakeLog("Stopping instance pool {}".format(resource.display_name))
-                    response = pool.stop_instance_pool(instance_pool_id=resource.identifier)
+                    Retry = True
+                    while Retry:
+                        try:
+                            response = pool.stop_instance_pool(instance_pool_id=resource.identifier)
+                            Retry = False
+                            success.append("Stopping instance pool {}".format(resource.display_name))
+                        except oci.exceptions.ServiceError as response:
+                            if response.status == 429:
+                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                time.sleep(RateLimitDelay)
+                            else:
+                                ErrorsFound = True
+                                errors.append("Error ({}) Stopping instance pool for {}".format(response.status,resource.display_name))
+                                Retry = False
 
             # Scale up action on running instance pool
             elif resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) > resourceDetails.size:
                 if Action == "All" or Action == "Up":
-                    success.append("Scaling up instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
                     MakeLog("Scaling up instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
                     pooldetails = oci.core.models.UpdateInstancePoolDetails()
                     pooldetails.size = int(schedulehours[CurrentHour])
-                    response = pool.update_instance_pool(instance_pool_id=resource.identifier, update_instance_pool_details=pooldetails).data
+                    Retry = True
+                    while Retry:
+                        try:
+                            response = pool.update_instance_pool(instance_pool_id=resource.identifier, update_instance_pool_details=pooldetails)
+                            Retry = False
+                            success.append("Scaling up instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
+                        except oci.exceptions.ServiceError as response:
+                            if response.status == 429:
+                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                time.sleep(RateLimitDelay)
+                            else:
+                                ErrorsFound = True
+                                errors.append("Error ({}) Scaling up instance pool {} to {} instances".format(response.status, resource.display_name, int(schedulehours[CurrentHour])))
+                                Retry = False
 
             # Scale down action on running instance pool
             elif resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) < resourceDetails.size:
                 if Action == "All" or Action == "Down":
-                    success.append("Scaling down instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
                     MakeLog("Scaling down instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour]) ))
                     pooldetails = oci.core.models.UpdateInstancePoolDetails()
                     pooldetails.size = int(schedulehours[CurrentHour])
-                    response = pool.update_instance_pool(instance_pool_id=resource.identifier, update_instance_pool_details=pooldetails).data
+                    Retry = True
+                    while Retry:
+                        try:
+                            response = pool.update_instance_pool(instance_pool_id=resource.identifier, update_instance_pool_details=pooldetails)
+                            Retry = False
+                            success.append("Scaling down instance pool {} to {} instances".format(resource.display_name, int(schedulehours[CurrentHour])))
+                        except oci.exceptions.ServiceError as response:
+                            if response.status == 429:
+                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                time.sleep(RateLimitDelay)
+                            else:
+                                ErrorsFound = True
+                                errors.append("Error ({}) Scaling down instance pool {} to {} instances".format(response.status,resource.display_name,int(schedulehours[CurrentHour])))
+                                Retry = False
 
             elif resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) > 0:
                 if Action == "All" or Action == "Up":
@@ -363,7 +563,20 @@ for resource in result.items:
                     if resourceDetails.size == int(schedulehours[CurrentHour]):
                         success.append("Starting instance pool {} from stopped state".format(resource.display_name))
                         MakeLog("Starting instance pool {} from stopped state".format(resource.display_name))
-                        response = pool.start_instance_pool(instance_pool_id=resource.identifier).data
+                        Retry = True
+                        while Retry:
+                            try:
+                                response = pool.start_instance_pool(instance_pool_id=resource.identifier)
+                                Retry = False
+                                success.append("Starting instance pool {} from stopped state".format(resource.display_name))
+                            except oci.exceptions.ServiceError as response:
+                                if response.status == 429:
+                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                    time.sleep(RateLimitDelay)
+                                else:
+                                    ErrorsFound = True
+                                    errors.append("Error ({}) Starting instance pool {} from stopped state".format(response.status, resource.display_name))
+                                    Retry = False
 
                     # Start instance pool and after that resize the instance pool to desired state:
                     if resourceDetails.size != int(schedulehours[CurrentHour]):
@@ -378,11 +591,21 @@ for t in threads:
    t.join()
 
 if len(TopicID) > 0:
-    body_message = "Scaling ({}) just completed. Found {} errors across {} scaleable instances (from a total of {} instances). \nError Details: {}\n\nSuccess Details: {}".format(Action, len(errors),len(success),total_resources,errors,success)
 
-    ns.publish_message(TopicID, {
-        "title": "Scaling Script ran across tenancy: {}".format(Tenancy.name),
-        "body": body_message
-    })
+    if LogLevel == "ALL" or (LogLevel == "ERRORS" and ErrorsFound):
+        MakeLog("Publishing notification")
+        body_message = "Scaling ({}) just completed. Found {} errors across {} scaleable instances (from a total of {} instances). \nError Details: {}\n\nSuccess Details: {}".format(Action, len(errors),len(success),total_resources,errors,success)
+        Retry = True
+        while Retry:
+            try:
+                response = ns.publish_message(TopicID, {"title": "Scaling Script ran across tenancy: {}".format(Tenancy.name),"body": body_message})
+                Retry = False
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    MakeLog("Error ({}) publishing notification".format(response.status))
+                    Retry = False
 
 MakeLog ("All scaling tasks done")
