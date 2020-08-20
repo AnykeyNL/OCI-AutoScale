@@ -5,7 +5,7 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW
-- Added support for Digital Assitant and Analytics Cloud
+- Added support for Digital Assistant and Analytics Cloud
 
 # Supported services
 - Compute VMs: On/Off
