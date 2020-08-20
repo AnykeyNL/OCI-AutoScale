@@ -15,7 +15,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Database Baremetal Servers: Scaling (# of CPUs)
 - Autonomous Database: On/Off and Scaling (# of CPUs)
 - Oracle Digital Assistant: On/Off
-- Oracle Analytics Cloud: On/Off and Scaling (2~8 and 10~12)
+- Oracle Analytics Cloud: On/Off and Scaling (between 2 and8 and 10-12)
 
 # Features
 - Support for using the script with Instance Principle. Meaning you can run this script inside OCI and when configured properly, you do not need to provide any details or credentials.
