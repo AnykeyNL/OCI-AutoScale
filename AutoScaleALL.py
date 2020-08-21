@@ -82,6 +82,8 @@ class AutonomousThread (threading.Thread):
                     errors.append(" - Error ({}) Starting Autonomous DB {}".format(response.status, self.NAME))
                     Retry = False
 
+        response = database.get_autonomous_database(autonomous_database_id=self.ID)
+        time.sleep(10)
         while response.data.lifecycle_state != "AVAILABLE":
             response = database.get_autonomous_database(autonomous_database_id=self.ID)
             time.sleep(10)
@@ -125,6 +127,8 @@ class PoolThread (threading.Thread):
                     errors.append(" - Error ({}) starting instance pool {}".format(response.status, self.NAME))
                     Retry = False
 
+        response = pool.get_instance_pool(instance_pool_id=self.ID)
+        time.sleep(10)
         while response.data.lifecycle_state != "RUNNING":
             response = pool.get_instance_pool(instance_pool_id=self.ID)
             time.sleep(10)
@@ -145,6 +149,56 @@ class PoolThread (threading.Thread):
                     ErrorsFound = True
                     errors.append(" - Error ({}) rescaling instance pool {}".format(response.status, self.NAME))
                     Retry = False
+
+class AnalyticsThread (threading.Thread):
+    def __init__(self, threadID, ID, NAME, CPU):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.ID = ID
+        self.NAME = NAME
+        self.CPU = CPU
+    def run(self):
+        MakeLog(" - Starting Analytics Service {} and after that scaling to {} cpus".format(self.NAME, self.CPU) )
+        Retry = True
+        while Retry:
+            try:
+                response = analytics.start_analytics_instance(analytics_instance_id=self.ID)
+                Retry = False
+                success.append("Started Analytics Service {}".format(self.NAME))
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    ErrorsFound = True
+                    errors.append(" - Error ({}) Starting Analytics Service {}".format(response.status, self.NAME))
+                    Retry = False
+
+        response = analytics.get_analytics_instance(analytics_instance_id=self.ID)
+        time.sleep(10)
+        while response.data.lifecycle_state != "ACTIVE":
+            response = analytics.get_analytics_instance(analytics_instance_id=self.ID)
+            time.sleep(10)
+        MakeLog("Analytics Service {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
+        capacity = oci.analytics.models.capacity.Capacity()
+        capacity.capacity_value = self.CPU
+        capacity.capacity_type = capacity.CAPACITY_TYPE_OLPU_COUNT
+        details = oci.analytics.models.ScaleAnalyticsInstanceDetails()
+        details.capacity = capacity
+        Retry = True
+        while Retry:
+            try:
+                response = analytics.scale_analytics_instance(analytics_instance_id=self.ID,scale_analytics_instance_details=details)
+                Retry = False
+                success.append("Analytics Service {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
+            except oci.exceptions.ServiceError as response:
+                if response.status == 429:
+                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                    time.sleep(RateLimitDelay)
+                else:
+                    errors.append("Error ({}) re-scaling Analytics to {} cpus for {}".format(response.status, self.CPU, self.NAME))
+                    Retry = False
+
 
 if UseInstancePrinciple:
     userName = "Instance Principle"
@@ -662,7 +716,6 @@ for resource in result.items:
             # Execute Startup operations
             if int(schedulehours[CurrentHour]) != 0 and resourceDetails.lifecycle_state == "INACTIVE":
                 if Action == "All" or Action == "Up":
-                    print ("{} - {}".format(int(resourceDetails.capacity.capacity_value),int(schedulehours[CurrentHour]) ))
                     if int(resourceDetails.capacity.capacity_value) == int(schedulehours[CurrentHour]):
                         MakeLog(" - Initiate Analytics Startup for {}".format(resource.display_name))
                         Retry = True
@@ -685,7 +738,10 @@ for resource in result.items:
 
                     # Execute Startup and scaling operations
                     else:
-                        print ("Startup and scale - not implemented yet")
+                        tcount = tcount + 1
+                        thread = AnalyticsThread(tcount, resource.identifier, resource.display_name,int(schedulehours[CurrentHour]))
+                        thread.start()
+                        threads.append(thread)
 
             # Execute scaling operations on running instance
             if resourceDetails.lifecycle_state == "ACTIVE" and int(schedulehours[CurrentHour]) != int(resourceDetails.capacity.capacity_value):
