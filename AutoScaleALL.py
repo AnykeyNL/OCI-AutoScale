@@ -66,7 +66,7 @@ class AutonomousThread (threading.Thread):
         self.NAME = NAME
         self.CPU = CPU
     def run(self):
-        MakeLog("Starting Autonomous DB {} and after that scaling to {} cpus".format(self.NAME, self.CPU) )
+        MakeLog(" - Starting Autonomous DB {} and after that scaling to {} cpus".format(self.NAME, self.CPU) )
         Retry = True
         while Retry:
             try:
@@ -79,7 +79,7 @@ class AutonomousThread (threading.Thread):
                     time.sleep(RateLimitDelay)
                 else:
                     ErrorsFound = True
-                    errors.append("Error ({}) Starting Autonomous DB {}".format(response.status, self.NAME))
+                    errors.append(" - Error ({}) Starting Autonomous DB {}".format(response.status, self.NAME))
                     Retry = False
 
         while response.data.lifecycle_state != "AVAILABLE":
@@ -99,7 +99,7 @@ class AutonomousThread (threading.Thread):
                     MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
                     time.sleep(RateLimitDelay)
                 else:
-                    errors.append("Error ({}) re-scaling to {} cpus for {}".format(response.status, self.CPU, self.NAME))
+                    errors.append(" - Error ({}) re-scaling to {} cpus for {}".format(response.status, self.CPU, self.NAME))
                     Retry = False
 
 class PoolThread (threading.Thread):
@@ -110,19 +110,19 @@ class PoolThread (threading.Thread):
         self.NAME = NAME
         self.INSTANCES = INSTANCES
     def run(self):
-        MakeLog("Starting Instance Pool {} and after that scaling to {} instances".format(self.NAME, self.INSTANCES) )
+        MakeLog(" - Starting Instance Pool {} and after that scaling to {} instances".format(self.NAME, self.INSTANCES) )
         Retry = True
         while Retry:
             try:
                 response = pool.start_instance_pool(instance_pool_id=self.ID)
                 Retry = False
-                success.append("Starting Instance Pool {}".format(self.NAME))
+                success.append(" - Starting Instance Pool {}".format(self.NAME))
             except oci.exceptions.ServiceError as response:
                 if response.status == 429:
                     MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
                     time.sleep(RateLimitDelay)
                 else:
-                    errors.append("Error ({}) starting instance pool {}".format(response.status, self.NAME))
+                    errors.append(" - Error ({}) starting instance pool {}".format(response.status, self.NAME))
                     Retry = False
 
         while response.data.lifecycle_state != "RUNNING":
@@ -143,7 +143,7 @@ class PoolThread (threading.Thread):
                     time.sleep(RateLimitDelay)
                 else:
                     ErrorsFound = True
-                    errors.append("Error ({}) rescaling instance pool {}".format(response.status, self.NAME))
+                    errors.append(" - Error ({}) rescaling instance pool {}".format(response.status, self.NAME))
                     Retry = False
 
 if UseInstancePrinciple:
@@ -171,6 +171,7 @@ if UseInstancePrinciple:
     ns = oci.ons.NotificationDataPlaneClient(config={}, signer=signer)
     oda= oci.oda.OdaClient(config={}, signer=signer)
     analytics = oci.analytics.AnalyticsClient(config={}, signer=signer)
+    integration = oci.integration.IntegrationInstanceClient(config={}, signer=signer)
 
     while SearchRootID:
         compartment = identity.get_compartment(compartment_id=SearchCompID).data
@@ -191,6 +192,7 @@ else:
     ns = oci.ons.NotificationDataPlaneClient(config)
     oda = oci.oda.OdaClient(config)
     analytics = oci.analytics.AnalyticsClient(config)
+    integration = oci.integration.IntegrationInstanceClient(config)
     user = identity.get_user(config["user"]).data
     userName = user.description
     RootCompartmentID = config["tenancy"]
@@ -268,7 +270,10 @@ for resource in result.items:
 
     # if schedule validated, let see if we can apply the new schedule to the resource
     if ActiveSchedule != "":
-        MakeLog(" - Active schedule for {} : {}".format(resource.display_name, ActiveSchedule))
+        p1 = CurrentHour*2
+        p2 = CurrentHour*2+1
+        DisplaySchedule = ActiveSchedule[:p1] + "[" + ActiveSchedule[p1:p2] + "]" + ActiveSchedule[p2:]
+        MakeLog(" - Active schedule for {} : {}".format(resource.display_name, DisplaySchedule))
 
         # Execute On/Off operations for compute VMs
         if resource.resource_type == "Instance":
@@ -710,28 +715,37 @@ for resource in result.items:
                     goscale = True
 
                 if goscale:
-                    MakeLog(" - Initiate Analytics Scaling from {} to {}oCPU for {}".format(
-                        int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
-                        resource.display_name))
-                    Retry = True
-                    while Retry:
-                        try:
-                            response = analytics.scale_analytics_instance(analytics_instance_id=resource.identifier,scale_analytics_instance_details=details)
-                            Retry = False
-                            success.append(" - Initiate Analytics Scaling from {} to {}oCPU for {}".format(int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]), resource.display_name))
-                        except oci.exceptions.ServiceError as response:
-                            if response.status == 429:
-                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
-                                time.sleep(RateLimitDelay)
-                            else:
-                                ErrorsFound = True
-                                errors.append(
-                                    " - Error ({}) Analytics scaling from {} to {}oCPU for {}".format(response.status, int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
-                                                                                    resource.display_name))
-                                MakeLog(
-                                    " - Error ({}) Analytics scaling from {} to {}oCPU for {}".format(response.status, int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
-                                                                                    resource.display_name))
+                    goscale = False
+                    if Action == "All":
+                        goscale = True
+                    elif int(resourceDetails.capacity.capacity_value) < int(schedulehours[CurrentHour]) and Action == "Up":
+                        goscale = True
+                    elif int(resourceDetails.capacity.capacity_value) > int(schedulehours[CurrentHour]) and Action == "Down":
+                        goscale = True
+
+                    if goscale:
+                        MakeLog(" - Initiate Analytics Scaling from {} to {}oCPU for {}".format(
+                            int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
+                            resource.display_name))
+                        Retry = True
+                        while Retry:
+                            try:
+                                response = analytics.scale_analytics_instance(analytics_instance_id=resource.identifier,scale_analytics_instance_details=details)
                                 Retry = False
+                                success.append(" - Initiate Analytics Scaling from {} to {}oCPU for {}".format(int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]), resource.display_name))
+                            except oci.exceptions.ServiceError as response:
+                                if response.status == 429:
+                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                    time.sleep(RateLimitDelay)
+                                else:
+                                    ErrorsFound = True
+                                    errors.append(
+                                        " - Error ({}) Analytics scaling from {} to {}oCPU for {}".format(response.status, int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
+                                                                                        resource.display_name))
+                                    MakeLog(
+                                        " - Error ({}) Analytics scaling from {} to {}oCPU for {}".format(response.status, int(resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
+                                                                                        resource.display_name))
+                                    Retry = False
                 else:
                     errors.append(
                         " - Error (Analytics scaling from {} to {}oCPU, invalid combination for {}".format(int(
@@ -741,6 +755,46 @@ for resource in result.items:
                         " - Error (Analytics scaling from {} to {}oCPU, invalid combination for {}".format(int(
                             resourceDetails.capacity.capacity_value), int(schedulehours[CurrentHour]),
                                                                                           resource.display_name))
+        if resource.resource_type == "IntegrationInstance":
+            if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
+                resourceDetails = integration.get_integration_instance(integration_instance_id=resource.identifier).data
+
+                if resourceDetails.lifecycle_state == "ACTIVE" and int(schedulehours[CurrentHour]) == 0:
+                    if Action == "All" or Action == "Down":
+                        MakeLog(" - Initiate Integration Service shutdown for {}".format(resource.display_name))
+                        Retry = True
+                        while Retry:
+                            try:
+                                response = integration.stop_integration_instance(integration_instance_id=resource.identifier)
+                                Retry = False
+                                success.append(" - Initiate Integration Service shutdown for {}".format(resource.display_name))
+                            except oci.exceptions.ServiceError as response:
+                                if response.status == 429:
+                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                    time.sleep(RateLimitDelay)
+                                else:
+                                    ErrorsFound = True
+                                    errors.append(" - Error ({}) Integration Service Shutdown for {}".format(response.status, resource.display_name))
+                                    MakeLog(" - Error ({}) Integration Service Shutdown for {}".format(response.status, resource.display_name))
+                                    Retry = False
+
+                if resourceDetails.lifecycle_state == "INACTIVE" and int(schedulehours[CurrentHour]) == 1:
+                    if Action == "All" or Action == "Up":
+                        MakeLog(" - Initiate Integration Service startup for {}".format(resource.display_name))
+                        Retry = True
+                        while Retry:
+                            try:
+                                response = integration.start_integration_instance(integration_instance_id=resource.identifier)
+                                Retry = False
+                                success.append(" - Initiate Integration Service startup for {}".format(resource.display_name))
+                            except oci.exceptions.ServiceError as response:
+                                if response.status == 429:
+                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                    time.sleep(RateLimitDelay)
+                                else:
+                                    ErrorsFound = True
+                                    errors.append(" - Error ({}) Integration Service startup for {}".format(response.status, resource.display_name))
+                                    Retry = False
 
 
 # Wait for any AutonomousDB and Instance Pool Start and rescale tasks completed

@@ -5,16 +5,18 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW
-- Added support for Digital Assistant and Analytics Cloud
+- Added support for Integration Service,Digital Assistant and Analytics Cloud
+- Each service with a Schedule is displayed, the value between [ ] show the current hour schedule
 
 # Supported services
 - Compute VMs: On/Off
 - Instance Pools: On/Off and Scaling (# of instances)
 - Database VMs: On/Off
 - Database Baremetal Servers: Scaling (# of CPUs)
-- Autonomous Database: On/Off and Scaling (# of CPUs)
+- Autonomous Databases: On/Off and Scaling (# of CPUs)
 - Oracle Digital Assistant: On/Off
-- Oracle Analytics Cloud: On/Off and Scaling (between 2 and8 and 10-12)
+- Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
+- Oracle Integration Service: On/Off
 
 # Features
 - Support for using the script with Instance Principle. Meaning you can run this script inside OCI and when configured properly, you do not need to provide any details or credentials.
@@ -26,7 +28,7 @@ localize this, that is possible in the script. For the predefined tag, you need 
 
 A single resource can contain multiple tags. A Weekend/Weekday tag overrules an AnyDay tag. A specific day of the week tag (ie. Monday) overrules all other tags.
 
-The value of the tag needs to contain 24 numbers (else it is ignored), seperated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
+The value of the tag needs to contain 24 numbers (else it is ignored), separated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
 
 ![Scaling Example Instance Pool](http://oc-blog.com/wp-content/uploads/2019/06/ScaleExamplePool.png)
 
