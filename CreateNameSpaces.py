@@ -27,9 +27,6 @@ if UseInstancePrinciple:
 
     identity = oci.identity.IdentityClient(config={}, signer=signer)
 
-    Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
-    MakeLog("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
-
     while SearchRootID:
         compartment = identity.get_compartment(compartment_id=SearchCompID).data
         if compartment.compartment_id[:14] == "ocid1.tenancy.":
@@ -37,6 +34,9 @@ if UseInstancePrinciple:
             SearchRootID = False
         else:
             SearchCompID = compartment.compartment_id
+
+    Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
+    MakeLog("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
 
     details = oci.identity.models.CreateTagNamespaceDetails()
 
