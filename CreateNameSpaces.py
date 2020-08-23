@@ -25,10 +25,10 @@ if UseInstancePrinciple:
        SearchRootID = True
     SearchCompID = compID
 
+    identity = oci.identity.IdentityClient(config={}, signer=signer)
+
     Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
     MakeLog("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
-
-    identity = oci.identity.IdentityClient(config={}, signer=signer)
 
     while SearchRootID:
         compartment = identity.get_compartment(compartment_id=SearchCompID).data
