@@ -33,6 +33,12 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
   - wget https://raw.githubusercontent.com/AnykeyNL/OCI-AutoScale/master/install.sh
   - bash install.sh
 
+The Install script will configure the time zone to European Central Time (CET). If you want to operate in a difference timezone, run the command:
+- sudo timedatectl set-timezone Europe/Amsterdam
+
+The instance is now all setup and will run 2 minutes before the hour all scaling down/power down operations 
+and 1 minute after the hour scaling up/power on operations.
+
 # How to use
 To control what to scale up/down or power on/off, you need to create a predefined tag called **Schedule**. If you want to
 localize this, that is possible in the script. For the predefined tag, you need entries for the days of the week, weekdays, weekends and anyday. The tags names are case sensitive! 
