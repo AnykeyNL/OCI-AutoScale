@@ -4,6 +4,9 @@ signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
 
 UseInstancePrinciple = True
 
+def MakeLog(msg):
+    print (msg)
+
 if UseInstancePrinciple:
     userName = "Instance Principle"
     try:
