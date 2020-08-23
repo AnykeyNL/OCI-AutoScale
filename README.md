@@ -22,6 +22,17 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Support for using the script with Instance Principle. Meaning you can run this script inside OCI and when configured properly, you do not need to provide any details or credentials.
 - Support for sending Notification after script is done. Thanks to Joel Nation for this! All you need to do is configure the Topic OCID in the script and make sure the user or instance principle has the correct permissions to publish Notifications.
 
+# Install script into (free-tier) Autonomous Linux Instance
+- Create a free-tier compute instance using the Autonomous Linux 7.8 image
+- Create a Dynamic Group called Autoscaling and add the OCID of your instance to the group, using this command:
+  - ANY {instance.id = 'your_OCID_of_your_Compute_Instance'}
+- Create a root level policy, giving your dynamic group permission to manage all resources in tenancy:
+  - allow dynamic-group Autoscaling to manage all-resources in tenancy
+- Login to your instance using an SSH connection
+- run the following commands:
+  - wget https://raw.githubusercontent.com/AnykeyNL/OCI-AutoScale/master/install.sh
+  - bash install.sh
+
 # How to use
 To control what to scale up/down or power on/off, you need to create a predefined tag called **Schedule**. If you want to
 localize this, that is possible in the script. For the predefined tag, you need entries for the days of the week, weekdays, weekends and anyday. The tags names are case sensitive! 
