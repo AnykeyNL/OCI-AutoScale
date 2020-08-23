@@ -5,6 +5,7 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW
+- Added install script for Oracle Autonomous Linux 7.8
 - Added support for Integration Service,Digital Assistant and Analytics Cloud
 - Each service with a Schedule is displayed, the value between [ ] show the current hour schedule
 
