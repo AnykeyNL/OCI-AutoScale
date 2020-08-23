@@ -1,4 +1,5 @@
 import oci
+import requests
 
 signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
 
