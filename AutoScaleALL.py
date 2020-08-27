@@ -33,6 +33,8 @@ ComputeShutdownMethod = "SOFTSTOP"
 LogLevel = "ALL" #  Use ALL or ERRORS. When set to ERRORS only a notification will be published if error occurs
 TopicID = ""  # Enter Topic OCID if you want the script to publish a message about the scaling actions
 
+AlternativeWeekend = False # Set to True is your weekend is Friday/Saturday
+
 RateLimitDelay = 2  # Time in seconds to wait before retry of operation
 # ============================================================
 
@@ -57,6 +59,16 @@ else:
     signer = None
 
 MakeLog("Starting Auto Scaling script, executing {} actions".format(Action))
+
+def isWeekDay(day):
+    weekday = True
+    if AlternativeWeekend:
+        if day == 4 or day == 5:
+            weekday = False
+    else:
+        if day == 5 or day == 6:
+            weekday = False
+    return weekday
 
 class AutonomousThread (threading.Thread):
     def __init__(self, threadID, ID, NAME, CPU):
@@ -257,7 +269,6 @@ Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
 
 MakeLog ("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
 
-
 regions = identity.list_region_subscriptions(RootCompartmentID).data
 regionnames = ""
 for region in regions:
@@ -272,7 +283,11 @@ tcount = 0
 DayOfWeek = datetime.datetime.today().weekday()   # Day of week as a number
 Day = Daysofweek[DayOfWeek]                       # Day of week as string
 CurrentHour = datetime.datetime.now().hour
-MakeLog ("Day of week: {} - Current hour: {}".format(Day,CurrentHour))
+
+if AlternativeWeekend:
+    MakeLog("Using Alternative weekend (Friday and Saturday as weekend")
+
+MakeLog ("Day of week: {} - Weekday: {} - Current hour: {}".format(Day,isWeekDay(DayOfWeek), CurrentHour))
 
 #Array start with 0 so decrease CurrentHour with 1
 CurrentHour = CurrentHour -1
@@ -297,7 +312,7 @@ for resource in result.items:
     ActiveSchedule = ""
     if AnyDay in schedule:
         ActiveSchedule = schedule[AnyDay]
-    if DayOfWeek < 5 : #check for weekday / weekend
+    if isWeekDay(DayOfWeek): #check for weekday / weekend
         if WeekDay in schedule:
             ActiveSchedule = schedule[WeekDay]
     else:
@@ -876,3 +891,4 @@ if len(TopicID) > 0:
                     Retry = False
 
 MakeLog ("All scaling tasks done")
+
