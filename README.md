@@ -29,6 +29,8 @@ When changing shape, All existing connections to this load balancer will be rese
 - Support for sending Notification after script is done. Thanks to Joel Nation for this! All you need to do is configure the Topic OCID in the script and make sure the user or instance principle has the correct permissions to publish Notifications.
 
 # Install script into (free-tier) Autonomous Linux Instance
+Youtube demonstration video: https://youtu.be/veHbyvDB74A
+
 - Create a free-tier compute instance using the Autonomous Linux 7.8 image
 - Create a Dynamic Group called Autoscaling and add the OCID of your instance to the group, using this command:
   - ANY {instance.id = 'your_OCID_of_your_Compute_Instance'}
