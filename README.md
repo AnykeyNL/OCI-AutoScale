@@ -22,7 +22,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)*
 
 *For the loadbalancer service, specify the number 10,100,400 or 8000 for each hour to set the correct shape.
-When changing shape, All existing connections to this load balancer will be reset during the update process and may take up to a minute, leading to potential connection loss.
+When changing shape, All existing connections to this load balancer will be reset during the update process and may take up to a minute, leading to potential connection loss. For non session persistent web based applications, I did not see any noticeable interruption or downtime in my own tests, but please test yourself!
 
 # Features
 - Support for using the script with Instance Principle. Meaning you can run this script inside OCI and when configured properly, you do not need to provide any details or credentials.
