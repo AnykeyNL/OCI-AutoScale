@@ -325,24 +325,33 @@ success=[]
 errors=[]
 for resource in result.items:
     # The search data is not always updated. Get the tags from the actual resource itself, not using the search data.
+    resourceOk = False
     if resource.resource_type == "Instance":
         resourceDetails = compute.get_instance(instance_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "DbSystem":
         resourceDetails = database.get_db_system(db_system_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "AutonomousDatabase":
         resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "InstancePool":
         resourceDetails = pool.get_instance_pool(instance_pool_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "OdaInstance":
         resourceDetails = oda.get_oda_instance(oda_instance_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "AnalyticsInstance":
         resourceDetails = analytics.get_analytics_instance(analytics_instance_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "IntegrationInstance":
         resourceDetails = integration.get_integration_instance(integration_instance_id=resource.identifier).data
+        resourceOk = True
     if resource.resource_type == "LoadBalancer":
         resourceDetails = loadbalancer.get_load_balancer(load_balancer_id=resource.identifier).data
+        resourceOk = True
 
-    if not isDeleted(resource.lifecycle_state):
+    if not isDeleted(resource.lifecycle_state) and resourceOk:
         MakeLog ("Checking: {} - {}".format(resource.display_name, resource.resource_type))
         schedule = resourceDetails.defined_tags[PredefinedTag]
         ActiveSchedule = ""
