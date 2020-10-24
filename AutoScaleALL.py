@@ -286,12 +286,6 @@ Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
 
 MakeLog ("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
 
-regions = identity.list_region_subscriptions(RootCompartmentID).data
-regionnames = ""
-for region in regions:
-    regionnames = regionnames + region.region_name + " "
-
-MakeLog ("Enabled regions: {}".format(regionnames))
 
 threads = []  # Thread array for async AutonomousDB start and rescale
 tcount = 0
@@ -331,6 +325,9 @@ for resource in result.items:
         resourceOk = True
     if resource.resource_type == "DbSystem":
         resourceDetails = database.get_db_system(db_system_id=resource.identifier).data
+        resourceOk = True
+    if resource.resource_type == "CloudVmCluster":
+        resourceDetails = database.get_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier).data
         resourceOk = True
     if resource.resource_type == "AutonomousDatabase":
         resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier).data
@@ -569,6 +566,52 @@ for resource in result.items:
                                             MakeLog(" - Error ({}) Exadata DB Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count,int(schedulehours[CurrentHour]), resource.display_name,response.message))
                                             Retry = False
 
+                # Execute Scaling operations for Cloud@customer Exadata Cluster VM
+                if resource.resource_type == "CloudVmCluster":
+                    if int(schedulehours[CurrentHour]) >= 0 and int(schedulehours[CurrentHour]) < 401:
+                        # Cluster VM is running, request is amount of CPU core change is needed
+                        if resourceDetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) > 0:
+                            if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
+                                if Action == "All" or Action == "Down":
+                                    MakeLog(" - Initiate ExadataC@C VM Cluster Scale Down to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
+                                    dbupdate = oci.database.models.UpdateCloudVmClusterDetails()
+                                    dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
+                                    Retry = True
+                                    while Retry:
+                                        try:
+                                            response = database.update_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier, update_cloud_vm_cluster_details=dbupdate)
+                                            Retry = False
+                                            success.append(" - Initiate ExadataC&C Cluster VM Scale Down from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
+                                        except oci.exceptions.ServiceError as response:
+                                            if response.status == 429:
+                                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                                time.sleep(RateLimitDelay)
+                                            else:
+                                                ErrorsFound = True
+                                                errors.append(" - Error ({}) ExadataC&C Cluster VM Scale Down from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]),resource.display_name, response.message))
+                                                MakeLog(" - Error ({}) ExadataC&C Cluster VM Scale Down from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]),resource.display_name, response.message))
+                                                Retry = False
+
+                            if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
+                                if Action == "All" or Action == "Up":
+                                    MakeLog(" - Initiate ExadataC@C VM Cluster Scale Up from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
+                                    dbupdate = oci.database.models.UpdateCloudVmClusterDetails()
+                                    dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
+                                    Retry = True
+                                    while Retry:
+                                        try:
+                                            response = database.update_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier, update_cloud_vm_cluster_details=dbupdate)
+                                            Retry = False
+                                            success.append(" - Initiate ExadataC&C Cluster VM Scale Up to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
+                                        except oci.exceptions.ServiceError as response:
+                                            if response.status == 429:
+                                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                                time.sleep(RateLimitDelay)
+                                            else:
+                                                ErrorsFound = True
+                                                errors.append(" - Error ({}) ExadataC&C Cluster VM Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                MakeLog(" - Error ({}) ExadataC&C Cluster VM Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                Retry = False
 
                 # Execute CPU Scale Up/Down operations for Database BMs
                 if resource.resource_type == "AutonomousDatabase":
@@ -618,6 +661,7 @@ for resource in result.items:
                                             else:
                                                 ErrorsFound = True
                                                 errors.append(" - Error ({}) Autonomous DB Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                MakeLog(" - Error ({}) Autonomous DB Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count,int(schedulehours[CurrentHour]), resource.display_name, response.message))
                                                 Retry = False
 
                         # Autonomous DB is running request is to stop the database
