@@ -578,7 +578,7 @@ for resource in result.items:
                                 if Action == "All" or Action == "Down":
                                     MakeLog(" - Initiate ExadataC@C VM Cluster Scale Down to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
                                     dbupdate = oci.database.models.UpdateVmClusterDetails()
-                                    dbupdate.cpus_enabled = int(schedulehours[CurrentHour])
+                                    dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
                                     Retry = True
                                     while Retry:
                                         try:
@@ -599,7 +599,7 @@ for resource in result.items:
                                 if Action == "All" or Action == "Up":
                                     MakeLog(" - Initiate ExadataC@C VM Cluster Scale Up from {} to {} for {}".format(resourceDetails.cpus_enabled, int(schedulehours[CurrentHour]), resource.display_name))
                                     dbupdate = oci.database.models.UpdateVmClusterDetails()
-                                    dbupdate.cpus_enabled = int(schedulehours[CurrentHour])
+                                    dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
                                     Retry = True
                                     while Retry:
                                         try:
