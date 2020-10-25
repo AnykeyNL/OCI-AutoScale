@@ -254,6 +254,7 @@ if UseInstancePrinciple:
     analytics = oci.analytics.AnalyticsClient(config={}, signer=signer)
     integration = oci.integration.IntegrationInstanceClient(config={}, signer=signer)
     loadbalancer = oci.load_balancer.LoadBalancerClient(config={}, signer=signer)
+    mysql = oci.mysql.MysqlaasClient(config={}, signer=signer)
 
     while SearchRootID:
         compartment = identity.get_compartment(compartment_id=SearchCompID).data
@@ -276,6 +277,7 @@ else:
     analytics = oci.analytics.AnalyticsClient(config)
     integration = oci.integration.IntegrationInstanceClient(config)
     loadbalancer = oci.load_balancer.LoadBalancerClient(config)
+    mysql = oci.mysql.MysqlaasClient(config)
     user = identity.get_user(config["user"]).data
     userName = user.description
     RootCompartmentID = config["tenancy"]
@@ -320,14 +322,15 @@ errors=[]
 for resource in result.items:
     # The search data is not always updated. Get the tags from the actual resource itself, not using the search data.
     resourceOk = False
+    print ("Checking {} - {}...".format(resource.display_name, resource.resource_type))
     if resource.resource_type == "Instance":
         resourceDetails = compute.get_instance(instance_id=resource.identifier).data
         resourceOk = True
     if resource.resource_type == "DbSystem":
         resourceDetails = database.get_db_system(db_system_id=resource.identifier).data
         resourceOk = True
-    if resource.resource_type == "CloudVmCluster":
-        resourceDetails = database.get_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier).data
+    if resource.resource_type == "VmCluster":
+        resourceDetails = database.get_vm_cluster(vm_cluster_id=resource.identifier).data
         resourceOk = True
     if resource.resource_type == "AutonomousDatabase":
         resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier).data
@@ -567,19 +570,19 @@ for resource in result.items:
                                             Retry = False
 
                 # Execute Scaling operations for Cloud@customer Exadata Cluster VM
-                if resource.resource_type == "CloudVmCluster":
+                if resource.resource_type == "VmCluster":
                     if int(schedulehours[CurrentHour]) >= 0 and int(schedulehours[CurrentHour]) < 401:
                         # Cluster VM is running, request is amount of CPU core change is needed
                         if resourceDetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) > 0:
                             if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
                                 if Action == "All" or Action == "Down":
                                     MakeLog(" - Initiate ExadataC@C VM Cluster Scale Down to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
-                                    dbupdate = oci.database.models.UpdateCloudVmClusterDetails()
+                                    dbupdate = oci.database.models.UpdateVmClusterDetails()
                                     dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
                                     Retry = True
                                     while Retry:
                                         try:
-                                            response = database.update_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier, update_cloud_vm_cluster_details=dbupdate)
+                                            response = database.update_vm_cluster(vm_cluster_id=resource.identifier, update_vm_cluster_details=dbupdate)
                                             Retry = False
                                             success.append(" - Initiate ExadataC&C Cluster VM Scale Down from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
                                         except oci.exceptions.ServiceError as response:
@@ -595,12 +598,12 @@ for resource in result.items:
                             if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
                                 if Action == "All" or Action == "Up":
                                     MakeLog(" - Initiate ExadataC@C VM Cluster Scale Up from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
-                                    dbupdate = oci.database.models.UpdateCloudVmClusterDetails()
+                                    dbupdate = oci.database.models.UpdateVmClusterDetails()
                                     dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
                                     Retry = True
                                     while Retry:
                                         try:
-                                            response = database.update_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier, update_cloud_vm_cluster_details=dbupdate)
+                                            response = database.update_vm_cluster(vm_cluster_id=resource.identifier, update_vm_cluster_details=dbupdate)
                                             Retry = False
                                             success.append(" - Initiate ExadataC&C Cluster VM Scale Up to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
                                         except oci.exceptions.ServiceError as response:
