@@ -60,7 +60,7 @@ The value of the tag needs to contain 24 numbers and/or wildcards (*) (else it i
 
 When a wild card is used, the service will stay unmodified for that hour. For example, the below schedule will turn of a compute instance in the evening/night, but allows the user to manage the state during the day.
 
-Schedule.AnyDay : 0,0,0,0,0,0,0,0,\*literal asterisks\*,*,*,*,*,*,*,*,0,0,0,0,0,0,0,0
+Schedule.AnyDay : 0,0,0,0,0,0,0,0,\*,*,*,*,*,*,*,*,0,0,0,0,0,0,0,0
 
 
 ![Scaling Example Instance Pool](http://oc-blog.com/wp-content/uploads/2019/06/ScaleExamplePool.png)
