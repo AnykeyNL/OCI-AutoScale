@@ -13,7 +13,6 @@ import time
 import sys
 import requests
 
-
 # You can modify / translate the tag names used by this script - case sensitive!!!
 PredefinedTag = "Schedule"
 AnyDay = "AnyDay"
@@ -254,7 +253,8 @@ if UseInstancePrinciple:
     analytics = oci.analytics.AnalyticsClient(config={}, signer=signer)
     integration = oci.integration.IntegrationInstanceClient(config={}, signer=signer)
     loadbalancer = oci.load_balancer.LoadBalancerClient(config={}, signer=signer)
-    mysql = oci.mysql.MysqlaasClient(config={}, signer=signer)
+    mysql = oci.mysql.DbSystemClient(config={}, signer=signer)
+    goldengate = oci.golden_gate.GoldenGateClient(config={}, signer=signer)
 
     while SearchRootID:
         compartment = identity.get_compartment(compartment_id=SearchCompID).data
@@ -277,11 +277,21 @@ else:
     analytics = oci.analytics.AnalyticsClient(config)
     integration = oci.integration.IntegrationInstanceClient(config)
     loadbalancer = oci.load_balancer.LoadBalancerClient(config)
-    mysql = oci.mysql.MysqlaasClient(config)
+    mysql = oci.mysql.DbSystemClient(config)
+    goldengate = oci.golden_gate.GoldenGateClient(config)
     user = identity.get_user(config["user"]).data
     userName = user.description
     RootCompartmentID = config["tenancy"]
     region = config["region"]
+
+
+def findAllCompartments():
+    query = "query compartment resources where lifeCycleState = 'ACTIVE'"
+    sdetails = oci.resource_search.models.StructuredSearchDetails()
+    sdetails.query = query
+    compartments = search.search_resources(search_details=sdetails, limit=1000).data
+    return compartments
+
 
 # Check credentials and enabled regions
 Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
@@ -307,12 +317,36 @@ CurrentHour = CurrentHour -1
 
 
 # Find all resources with a Schedule Tag
+print ("Getting all resources supported by the search function...")
 query = "query all resources where (definedTags.namespace = '{}')".format(PredefinedTag)
 
 sdetails = oci.resource_search.models.StructuredSearchDetails()
 sdetails.query = query
 
 result = search.search_resources(search_details=sdetails, limit=1000).data
+
+# Find additional resources not found by search (MySQL Service)
+print ("Getting all compartments...")
+compartments = findAllCompartments()
+print ("Finding MySQL instances...")
+for c in compartments.items:
+    mysql_instances = oci.pagination.list_call_get_all_results(mysql.list_db_systems, compartment_id=c.identifier).data
+    for mysql_instance in mysql_instances:
+        if mysql_instance.lifecycle_state != "DELETED":
+            try:
+                summary = oci.resource_search.models.ResourceSummary()
+                schedule = mysql_instance.defined_tags[PredefinedTag]  # Check is Predefined tag is present, else error (ignoring instance)
+                summary.availability_domain = mysql_instance.availability_domain
+                summary.compartment_id = mysql_instance.compartment_id
+                summary.defined_tags = mysql_instance.defined_tags
+                summary.freeform_tags = mysql_instance.freeform_tags
+                summary.identifier = mysql_instance.id
+                summary.lifecycle_state = mysql_instance.lifecycle_state
+                summary.display_name = mysql_instance.display_name
+                summary.resource_type = "MysqlDBInstance"
+                result.items.append(summary)
+            except:
+                pass
 
 # All the items with a schedule are now collected.
 # Let's go thru them and find / validate the correct schedule
@@ -322,7 +356,7 @@ errors=[]
 for resource in result.items:
     # The search data is not always updated. Get the tags from the actual resource itself, not using the search data.
     resourceOk = False
-    print ("Checking {} - {}...".format(resource.display_name, resource.resource_type))
+    print ("Checking {} ({})...".format(resource.display_name, resource.resource_type))
     if resource.resource_type == "Instance":
         resourceDetails = compute.get_instance(instance_id=resource.identifier).data
         resourceOk = True
@@ -349,6 +383,12 @@ for resource in result.items:
         resourceOk = True
     if resource.resource_type == "LoadBalancer":
         resourceDetails = loadbalancer.get_load_balancer(load_balancer_id=resource.identifier).data
+        resourceOk = True
+    if resource.resource_type == "MysqlDBInstance":
+        resourceDetails = mysql.get_db_system(db_system_id=resource.identifier).data
+        resourceOk = True
+    if resource.resource_type == "GoldenGateDeployment":
+        resourceDetails = goldengate.get_deployment(deployment_id=resource.identifier).data
         resourceOk = True
 
     if not isDeleted(resource.lifecycle_state) and resourceOk:
@@ -393,7 +433,7 @@ for resource in result.items:
                     DisplaySchedule = DisplaySchedule + h + ","
                 c = c + 1
 
-            MakeLog(" - Active schedule for {} : {}".format(resource.display_name, DisplaySchedule))
+            MakeLog(" - Active schedule for {}: {}".format(resource.display_name, DisplaySchedule))
 
             if schedulehours[CurrentHour] == "*":
                 MakeLog(" - Ignoring this service for this hour")
@@ -444,42 +484,43 @@ for resource in result.items:
                 if resource.resource_type == "DbSystem":
                     # Execute On/Off operations for Database VMs
                     if resourceDetails.shape[:2] == "VM":
-                        dbnodedetails = database.list_db_nodes(compartment_id=resource.compartment_id, db_system_id=resource.identifier).data[0]
-                        if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
-                            if dbnodedetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) == 0:
-                                if Action == "All" or Action == "Down":
-                                    MakeLog(" - Initiate DB VM shutdown for {}".format(resource.display_name))
-                                    Retry = True
-                                    while Retry:
-                                        try:
-                                            response = database.db_node_action(db_node_id=dbnodedetails.id, action="STOP")
-                                            Retry = False
-                                            success.append(" - Initiate DB VM shutdown for {}".format(resource.display_name))
-                                        except oci.exceptions.ServiceError as response:
-                                            if response.status == 429:
-                                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
-                                                time.sleep(RateLimitDelay)
-                                            else:
-                                                ErrorsFound = True
-                                                errors.append(" - Error ({}) DB VM shutdown for {} - {}".format(response.status, resource.display_name, response.message))
+                        dbnodes = database.list_db_nodes(compartment_id=resource.compartment_id, db_system_id=resource.identifier).data
+                        for dbnodedetails in dbnodes:
+                            if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
+                                if dbnodedetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) == 0:
+                                    if Action == "All" or Action == "Down":
+                                        MakeLog(" - Initiate DB VM shutdown for {}".format(resource.display_name))
+                                        Retry = True
+                                        while Retry:
+                                            try:
+                                                response = database.db_node_action(db_node_id=dbnodedetails.id, action="STOP")
                                                 Retry = False
-                            if dbnodedetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
-                                if Action == "All" or Action == "Up":
-                                    MakeLog(" - Initiate DB VM startup for {}".format(resource.display_name))
-                                    Retry = True
-                                    while Retry:
-                                        try:
-                                            response = database.db_node_action(db_node_id=dbnodedetails.id, action="START")
-                                            Retry = False
-                                            success.append(" - Initiate DB VM startup for {}".format(resource.display_name))
-                                        except oci.exceptions.ServiceError as response:
-                                            if response.status == 429:
-                                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
-                                                time.sleep(RateLimitDelay)
-                                            else:
-                                                ErrorsFound = True
-                                                errors.append(" - Error ({}) DB VM startup for {} - {}".format(response.status, resource.display_name, response.message))
+                                                success.append(" - Initiate DB VM shutdown for {}".format(resource.display_name))
+                                            except oci.exceptions.ServiceError as response:
+                                                if response.status == 429:
+                                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                                    time.sleep(RateLimitDelay)
+                                                else:
+                                                    ErrorsFound = True
+                                                    errors.append(" - Error ({}) DB VM shutdown for {} - {}".format(response.status, resource.display_name, response.message))
+                                                    Retry = False
+                                if dbnodedetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
+                                    if Action == "All" or Action == "Up":
+                                        MakeLog(" - Initiate DB VM startup for {}".format(resource.display_name))
+                                        Retry = True
+                                        while Retry:
+                                            try:
+                                                response = database.db_node_action(db_node_id=dbnodedetails.id, action="START")
                                                 Retry = False
+                                                success.append(" - Initiate DB VM startup for {}".format(resource.display_name))
+                                            except oci.exceptions.ServiceError as response:
+                                                if response.status == 429:
+                                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                                    time.sleep(RateLimitDelay)
+                                                else:
+                                                    ErrorsFound = True
+                                                    errors.append(" - Error ({}) DB VM startup for {} - {}".format(response.status, resource.display_name, response.message))
+                                                    Retry = False
 
                     # Execute CPU Scale Up/Down operations for Database BMs
                     if resourceDetails.shape[:2] == "BM":
@@ -1041,6 +1082,119 @@ for resource in result.items:
 
                     else:
                         MakeLog(" - Error {}: requested shape {} does not exists".format(resource.display_name, requestedShape))
+
+                if resource.resource_type == "MysqlDBInstance":
+                    if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
+                        if resourceDetails.lifecycle_state == "ACTIVE" and int(schedulehours[CurrentHour]) == 0:
+                            if Action == "All" or Action == "Down":
+                                MakeLog(" - Initiate MySQL shutdown for {}".format(resource.display_name))
+                                Retry = True
+                                while Retry:
+                                    try:
+                                        stopaction = oci.mysql.models.StopDbSystemDetails()
+                                        stopaction.shutdown_type = "SLOW"
+                                        response = mysql.stop_db_system(db_system_id=resource.identifier, stop_db_system_details=stopaction)
+                                        Retry = False
+                                        success.append(
+                                            " - Initiate MySql shutdown for {}".format(resource.display_name))
+                                    except oci.exceptions.ServiceError as response:
+                                        if response.status == 429:
+                                            MakeLog(
+                                                "Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                            time.sleep(RateLimitDelay)
+                                        else:
+                                            ErrorsFound = True
+                                            errors.append(
+                                                " - Error ({}) MySQL Shutdown for {} - {}".format(response.status,
+                                                                                                       resource.display_name,
+                                                                                                       response.message))
+                                            MakeLog(
+                                                " - Error ({}) MySQL Shutdown for {} - {}".format(response.status,
+                                                                                                       resource.display_name,
+                                                                                                       response.message))
+                                            Retry = False
+
+                        if resourceDetails.lifecycle_state == "INACTIVE" and int(schedulehours[CurrentHour]) == 1:
+                            if Action == "All" or Action == "Up":
+                                MakeLog(" - Initiate MySQL startup for {}".format(resource.display_name))
+                                Retry = True
+                                while Retry:
+                                    try:
+                                        response = mysql.start_db_system(db_system_id=resource.identifier)
+                                        Retry = False
+                                        success.append(
+                                            " - Initiate MySQL startup for {}".format(resource.display_name))
+                                    except oci.exceptions.ServiceError as response:
+                                        if response.status == 429:
+                                            MakeLog(
+                                                "Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                            time.sleep(RateLimitDelay)
+                                        else:
+                                            ErrorsFound = True
+                                            errors.append(
+                                                " - Error ({}) MySQL startup for {} - {}".format(response.status,
+                                                                                                      resource.display_name,
+                                                                                                      response.message))
+                                            Retry = False
+
+                if resource.resource_type == "GoldenGateDeployment":
+                    if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
+                        if resourceDetails.lifecycle_state == "ACTIVE" and int(schedulehours[CurrentHour]) == 0:
+                            if Action == "All" or Action == "Down":
+                                MakeLog(" - Initiate GoldenGate shutdown for {}".format(resource.display_name))
+                                Retry = True
+                                while Retry:
+                                    try:
+                                        stopaction = oci.golden_gate.models.StopDeploymentDetails()
+                                        stopaction.type = "DEFAULT"
+                                        response = goldengate.stop_deployment(deployment_id=resource.identifier, stop_deployment_details=stopaction)
+
+                                        Retry = False
+                                        success.append(
+                                            " - Initiate GoldenGate shutdown for {}".format(resource.display_name))
+                                    except oci.exceptions.ServiceError as response:
+                                        if response.status == 429:
+                                            MakeLog(
+                                                "Rate limit kicking in.. waiting {} seconds...".format(
+                                                    RateLimitDelay))
+                                            time.sleep(RateLimitDelay)
+                                        else:
+                                            ErrorsFound = True
+                                            errors.append(
+                                                " - Error ({}) GoldenGate Shutdown for {} - {}".format(response.status,
+                                                                                                  resource.display_name,
+                                                                                                  response.message))
+                                            MakeLog(
+                                                " - Error ({}) GoldenGate Shutdown for {} - {}".format(response.status,
+                                                                                                  resource.display_name,
+                                                                                                  response.message))
+                                            Retry = False
+
+                        if resourceDetails.lifecycle_state == "INACTIVE" and int(schedulehours[CurrentHour]) == 1:
+                            if Action == "All" or Action == "Up":
+                                MakeLog(" - Initiate GoldenGate startup for {}".format(resource.display_name))
+                                Retry = True
+                                while Retry:
+                                    try:
+                                        startaction = oci.golden_gate.models.StartDeploymentDetails()
+                                        startaction.type = "DEFAULT"
+                                        response = goldengate.start_deployment(deployment_id=resource.identifier, start_deployment_details=startaction)
+                                        Retry = False
+                                        success.append(
+                                            " - Initiate GoldenGate startup for {}".format(resource.display_name))
+                                    except oci.exceptions.ServiceError as response:
+                                        if response.status == 429:
+                                            MakeLog(
+                                                "Rate limit kicking in.. waiting {} seconds...".format(
+                                                    RateLimitDelay))
+                                            time.sleep(RateLimitDelay)
+                                        else:
+                                            ErrorsFound = True
+                                            errors.append(
+                                                " - Error ({}) GoldenGate startup for {} - {}".format(response.status,
+                                                                                                 resource.display_name,
+                                                                                                 response.message))
+                                            Retry = False
 
 # Wait for any AutonomousDB and Instance Pool Start and rescale tasks completed
 for t in threads:

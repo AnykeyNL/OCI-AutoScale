@@ -5,10 +5,9 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW
-- Support for 'wildcard', when you use * for the hour, the service will be unmodified for that hour.
-- Added support for Exadata
-- Added support for Network Load Balancer
-- Bug fixes (specific weekdays were not working) and better error messaging.
+- Support for MySQL service added
+- Support for GoldenGate service added
+- Bug fix for DB RAC instances, now both nodes are shutdown / started
 
 # Supported services
 - Compute VMs: On/Off
@@ -21,9 +20,14 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
 - Oracle Integration Service: On/Off
 - Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)*
+- MySQL Service: On/Off**
+- GoldenGate: On/Off
 
 *For the loadbalancer service, specify the number 10,100,400 or 8000 for each hour to set the correct shape.
 When changing shape, All existing connections to this load balancer will be reset during the update process and may take up to a minute, leading to potential connection loss. For non session persistent web based applications, I did not see any noticeable interruption or downtime in my own tests, but please test yourself!
+
+**MySQL Instances are not found by the search function :-( So a special routine is run to query them. 
+Also MySQL instances that are not running (Active state)) do not allow their tags to be changed/added/removed. 
 
 # Features
 - Support for using the script with Instance Principle. Meaning you can run this script inside OCI and when configured properly, you do not need to provide any details or credentials.
