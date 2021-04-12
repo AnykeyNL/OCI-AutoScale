@@ -93,10 +93,10 @@ class AutonomousThread (threading.Thread):
                     errors.append(" - Error ({}) Starting Autonomous DB {}".format(response.status, self.NAME))
                     Retry = False
 
-        response = database.get_autonomous_database(autonomous_database_id=self.ID)
+        response = database.get_autonomous_database(autonomous_database_id=self.ID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
         time.sleep(10)
         while response.data.lifecycle_state != "AVAILABLE":
-            response = database.get_autonomous_database(autonomous_database_id=self.ID)
+            response = database.get_autonomous_database(autonomous_database_id=self.ID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
             time.sleep(10)
         MakeLog("Autonomous DB {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
         dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
@@ -138,10 +138,10 @@ class PoolThread (threading.Thread):
                     errors.append(" - Error ({}) starting instance pool {}".format(response.status, self.NAME))
                     Retry = False
 
-        response = pool.get_instance_pool(instance_pool_id=self.ID)
+        response = pool.get_instance_pool(instance_pool_id=self.ID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
         time.sleep(10)
         while response.data.lifecycle_state != "RUNNING":
-            response = pool.get_instance_pool(instance_pool_id=self.ID)
+            response = pool.get_instance_pool(instance_pool_id=self.ID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
             time.sleep(10)
         MakeLog("Instance pool {} started, re-scaling to {} instances".format(self.NAME, self.INSTANCES))
         pooldetails = oci.core.models.UpdateInstancePoolDetails()
@@ -185,10 +185,10 @@ class AnalyticsThread (threading.Thread):
                     errors.append(" - Error ({}) Starting Analytics Service {}".format(response.status, self.NAME))
                     Retry = False
 
-        response = analytics.get_analytics_instance(analytics_instance_id=self.ID)
+        response = analytics.get_analytics_instance(analytics_instance_id=self.ID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
         time.sleep(10)
         while response.data.lifecycle_state != "ACTIVE":
-            response = analytics.get_analytics_instance(analytics_instance_id=self.ID)
+            response = analytics.get_analytics_instance(analytics_instance_id=self.ID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
             time.sleep(10)
         MakeLog("Analytics Service {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
         capacity = oci.analytics.models.capacity.Capacity()
@@ -257,7 +257,7 @@ if UseInstancePrinciple:
     goldengate = oci.golden_gate.GoldenGateClient(config={}, signer=signer)
 
     while SearchRootID:
-        compartment = identity.get_compartment(compartment_id=SearchCompID).data
+        compartment = identity.get_compartment(compartment_id=SearchCompID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         if compartment.compartment_id[:14] == "ocid1.tenancy.":
             RootCompartmentID = compartment.compartment_id
             SearchRootID = False
@@ -289,12 +289,12 @@ def findAllCompartments():
     query = "query compartment resources where lifeCycleState = 'ACTIVE'"
     sdetails = oci.resource_search.models.StructuredSearchDetails()
     sdetails.query = query
-    compartments = search.search_resources(search_details=sdetails, limit=1000).data
+    compartments = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
     return compartments
 
 
 # Check credentials and enabled regions
-Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
+Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
 
 MakeLog ("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
 
@@ -323,14 +323,14 @@ query = "query all resources where (definedTags.namespace = '{}')".format(Predef
 sdetails = oci.resource_search.models.StructuredSearchDetails()
 sdetails.query = query
 
-result = search.search_resources(search_details=sdetails, limit=1000).data
+result = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
 
 # Find additional resources not found by search (MySQL Service)
 print ("Getting all compartments...")
 compartments = findAllCompartments()
 print ("Finding MySQL instances...")
 for c in compartments.items:
-    mysql_instances = oci.pagination.list_call_get_all_results(mysql.list_db_systems, compartment_id=c.identifier).data
+    mysql_instances = oci.pagination.list_call_get_all_results(mysql.list_db_systems, compartment_id=c.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
     for mysql_instance in mysql_instances:
         if mysql_instance.lifecycle_state != "DELETED":
             try:
@@ -358,37 +358,37 @@ for resource in result.items:
     resourceOk = False
     print ("Checking {} ({})...".format(resource.display_name, resource.resource_type))
     if resource.resource_type == "Instance":
-        resourceDetails = compute.get_instance(instance_id=resource.identifier).data
+        resourceDetails = compute.get_instance(instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "DbSystem":
-        resourceDetails = database.get_db_system(db_system_id=resource.identifier).data
+        resourceDetails = database.get_db_system(db_system_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "VmCluster":
-        resourceDetails = database.get_vm_cluster(vm_cluster_id=resource.identifier).data
+        resourceDetails = database.get_vm_cluster(vm_cluster_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "AutonomousDatabase":
-        resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier).data
+        resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "InstancePool":
-        resourceDetails = pool.get_instance_pool(instance_pool_id=resource.identifier).data
+        resourceDetails = pool.get_instance_pool(instance_pool_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "OdaInstance":
-        resourceDetails = oda.get_oda_instance(oda_instance_id=resource.identifier).data
+        resourceDetails = oda.get_oda_instance(oda_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "AnalyticsInstance":
-        resourceDetails = analytics.get_analytics_instance(analytics_instance_id=resource.identifier).data
+        resourceDetails = analytics.get_analytics_instance(analytics_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "IntegrationInstance":
-        resourceDetails = integration.get_integration_instance(integration_instance_id=resource.identifier).data
+        resourceDetails = integration.get_integration_instance(integration_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "LoadBalancer":
-        resourceDetails = loadbalancer.get_load_balancer(load_balancer_id=resource.identifier).data
+        resourceDetails = loadbalancer.get_load_balancer(load_balancer_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "MysqlDBInstance":
-        resourceDetails = mysql.get_db_system(db_system_id=resource.identifier).data
+        resourceDetails = mysql.get_db_system(db_system_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
     if resource.resource_type == "GoldenGateDeployment":
-        resourceDetails = goldengate.get_deployment(deployment_id=resource.identifier).data
+        resourceDetails = goldengate.get_deployment(deployment_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
         resourceOk = True
 
     if not isDeleted(resource.lifecycle_state) and resourceOk:
@@ -1064,7 +1064,7 @@ for resource in result.items:
                                 details.shape_name = "{}Mbps".format(requestedShape)
                                 MakeLog(" - Downsizing loadbalancer from {} to {}".format(resourceDetails.shape_name, details.shape_name))
                                 try:
-                                    loadbalancer.update_load_balancer_shape(load_balancer_id=resource.identifier, update_load_balancer_shape_details=details)
+                                    loadbalancer.update_load_balancer_shape(load_balancer_id=resource.identifier, update_load_balancer_shape_details=details, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
                                 except oci.exceptions.ServiceError as response:
                                     MakeLog (" - Error Downsizing: {}".format(response.message))
                                     errors.append(" - Error ({}) Integration Service startup for {}".format(response.message, resource.display_name))
@@ -1075,7 +1075,7 @@ for resource in result.items:
                                 details.shape_name = "{}Mbps".format(requestedShape)
                                 MakeLog(" - Upsizing loadbalancer from {} to {}".format(resourceDetails.shape_name, details.shape_name))
                                 try:
-                                    loadbalancer.update_load_balancer_shape(load_balancer_id=resource.identifier, update_load_balancer_shape_details=details)
+                                    loadbalancer.update_load_balancer_shape(load_balancer_id=resource.identifier, update_load_balancer_shape_details=details, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
                                 except oci.exceptions.ServiceError as response:
                                     MakeLog (" - Error Upsizing: {} ".format(response.message))
                                     errors.append(" - Error ({}) Integration Service startup for {}".format(response.message, resource.display_name))
