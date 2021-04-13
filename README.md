@@ -84,10 +84,5 @@ To ensure the script runs as fast as possible, all blocking operations (power on
 
 You can deploy this script anywhere you like as long as the location has internet access to the OCI API services. 
 
-# More information
-Please check www.oc-blog.com
-
 ## Disclaimer
-This is a personal repository. Any code, views or opinions represented here are personal and belong solely to me and do not represent those of people, institutions or organizations that I may or may not be associated with in professional or personal capacity, unless explicitly stated.
-
 **Please test properly on test resources, before using it on production resources to prevent unwanted outages or very expensive bills.**
