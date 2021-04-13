@@ -1,11 +1,12 @@
 #!/home/opc/py36env/bin/python
 # OCI - Scheduled Auto Scaling Script
-# Written by: Richard Garsthagen - richard@oc-blog.com
-# Co-Developers: Joel Nation (https://github.com/Joelith)
-# Version 2.2 - August 20200
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.  All rights reserved.
+# This software is licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
 #
-# More info see: www.oc-blog.com
+# Written by: Richard Garsthagen
+# Contributors: Joel Nation
 #
+
 import oci
 import datetime
 import threading

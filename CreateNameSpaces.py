@@ -1,10 +1,11 @@
 #!/home/opc/py36env/bin/python
 # OCI - Create Namespace and key tags for Auto Scaling Script
-# Written by: Richard Garsthagen - richard@oc-blog.com
-# Co-Developers: Joel Nation (https://github.com/Joelith)
-# Version 2.2 - August 20200
 #
-# More info see: www.oc-blog.com
+# Copyright (c) 2016, 2020, Oracle and/or its affiliates.  All rights reserved.
+# This software is licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
+#
+# Written by: Richard Garsthagen
+# Contributors: Joel Nation
 #
 # This script is designed to run inside an OCI instance, assigned with the right permissions to manage the tenancy
 
