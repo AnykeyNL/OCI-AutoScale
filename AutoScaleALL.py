@@ -328,9 +328,10 @@ result = search.search_resources(search_details=sdetails, limit=1000, retry_stra
 
 # Find additional resources not found by search (MySQL Service)
 print ("Getting all compartments...")
-compartments = findAllCompartments()
+old_compartments = findAllCompartments()
+compartments=[oc for oc in old_compartments.items if oc.display_name!="ManagedCompartmentForPaaS"]
 print ("Finding MySQL instances...")
-for c in compartments.items:
+for c in compartments:
     mysql_instances = oci.pagination.list_call_get_all_results(mysql.list_db_systems, compartment_id=c.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
     for mysql_instance in mysql_instances:
         if mysql_instance.lifecycle_state != "DELETED":
