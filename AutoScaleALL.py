@@ -287,7 +287,7 @@ else:
 
 
 def findAllCompartments():
-    query = "query compartment resources where lifeCycleState = 'ACTIVE'"
+    query = "query compartment resources where lifeCycleState = 'ACTIVE' && displayName != 'ManagedCompartmentForPaaS'"
     sdetails = oci.resource_search.models.StructuredSearchDetails()
     sdetails.query = query
     compartments = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
@@ -328,10 +328,9 @@ result = search.search_resources(search_details=sdetails, limit=1000, retry_stra
 
 # Find additional resources not found by search (MySQL Service)
 print ("Getting all compartments...")
-old_compartments = findAllCompartments()
-compartments=[oc for oc in old_compartments.items if oc.display_name!="ManagedCompartmentForPaaS"]
+compartments = findAllCompartments()
 print ("Finding MySQL instances...")
-for c in compartments:
+for c in compartments.items:
     mysql_instances = oci.pagination.list_call_get_all_results(mysql.list_db_systems, compartment_id=c.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
     for mysql_instance in mysql_instances:
         if mysql_instance.lifecycle_state != "DELETED":
