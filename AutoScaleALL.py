@@ -19,6 +19,7 @@
 #   -ic        - include compartment ocid
 #   -ec        - exclude compartment ocid
 #   -ignrtime  - ignore region time zone
+#   -ignormysql- ignore mysql execution
 #   -printocid - print ocid of object
 #   -topic     - topic to sent summary
 #   -h         - help
@@ -37,7 +38,7 @@ import os
 AnyDay = "AnyDay"
 Weekend = "Weekend"
 WeekDay = "WeekDay"
-Version = "2021.04.25"
+Version = "2021.05.05"
 
 # ============== CONFIGURE THIS SECTION ======================
 # OCI Configuration
@@ -49,6 +50,12 @@ TopicID = ""  # Enter Topic OCID if you want the script to publish a message abo
 
 AlternativeWeekend = False  # Set to True is your weekend is Friday/Saturday
 RateLimitDelay = 2  # Time in seconds to wait before retry of operation
+
+##########################################################################
+# Get current host time and utc on execution
+##########################################################################
+current_host_time = datetime.datetime.today()
+current_utc_time = datetime.datetime.utcnow()
 
 
 ##########################################################################
@@ -138,11 +145,10 @@ def get_current_hour(region, ignore_region_time=False):
         timezdiff = 0
 
     # Get current host time
-    current_time = datetime.datetime.today()
+    current_time = current_host_time
 
     # if need to use region time
     if not ignore_region_time:
-        current_utc_time = datetime.datetime.utcnow()
         current_time = current_utc_time + datetime.timedelta(hours=timezdiff)
 
     # get the variables to return
@@ -498,8 +504,8 @@ def autoscale_region(region):
 
     MakeLog("Day of week: {}, IsWeekday: {},  Current hour: {}".format(Day, isWeekDay(DayOfWeek), CurrentHour))
 
-    # Array start with 0 so decrease CurrentHour with 1
-    CurrentHour = CurrentHour - 1
+    # Array start with 0 so decrease CurrentHour with 1, if hour = 0 then 23
+    CurrentHour = 23 if CurrentHour == 0 else CurrentHour - 1
 
     ###############################################
     # Find all resources with a Schedule Tag
@@ -515,48 +521,50 @@ def autoscale_region(region):
     #################################################################
     # Find additional resources not found by search (MySQL Service)
     #################################################################
-    MakeLog("Finding MySQL instances in {} Compartments...".format(len(compartments)))
-    for c in compartments:
+    if cmd.ignoremysql:
 
-        # check compartment include and exclude
-        if c.lifecycle_state != oci.identity.models.Compartment.LIFECYCLE_STATE_ACTIVE:
-            continue
-        if compartment_include:
-            if c.id != compartment_include:
+        MakeLog("Finding MySQL instances in {} Compartments...".format(len(compartments)))
+        for c in compartments:
+
+            # check compartment include and exclude
+            if c.lifecycle_state != oci.identity.models.Compartment.LIFECYCLE_STATE_ACTIVE:
                 continue
-        if compartment_exclude:
-            if c.id == compartment_exclude:
-                continue
+            if compartment_include:
+                if c.id != compartment_include:
+                    continue
+            if compartment_exclude:
+                if c.id == compartment_exclude:
+                    continue
 
-        mysql_instances = []
-        try:
-            mysql_instances = oci.pagination.list_call_get_all_results(
-                mysql.list_db_systems,
-                compartment_id=c.id,
-                retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY
-            ).data
-        except Exception:
-            MakeLog("e", True)
-            continue
-
-        MakeLog(".", True)
-
-        for mysql_instance in mysql_instances:
-            if PredefinedTag not in mysql_instance.defined_tags or mysql_instance.lifecycle_state != "ACTIVE":
+            mysql_instances = []
+            try:
+                mysql_instances = oci.pagination.list_call_get_all_results(
+                    mysql.list_db_systems,
+                    compartment_id=c.id,
+                    retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY
+                ).data
+            except Exception:
+                MakeLog("e", True)
                 continue
 
-            summary = oci.resource_search.models.ResourceSummary()
-            summary.availability_domain = mysql_instance.availability_domain
-            summary.compartment_id = mysql_instance.compartment_id
-            summary.defined_tags = mysql_instance.defined_tags
-            summary.freeform_tags = mysql_instance.freeform_tags
-            summary.identifier = mysql_instance.id
-            summary.lifecycle_state = mysql_instance.lifecycle_state
-            summary.display_name = mysql_instance.display_name
-            summary.resource_type = "MysqlDBInstance"
-            result.items.append(summary)
+            MakeLog(".", True)
 
-    MakeLog("")
+            for mysql_instance in mysql_instances:
+                if PredefinedTag not in mysql_instance.defined_tags or mysql_instance.lifecycle_state != "ACTIVE":
+                    continue
+
+                summary = oci.resource_search.models.ResourceSummary()
+                summary.availability_domain = mysql_instance.availability_domain
+                summary.compartment_id = mysql_instance.compartment_id
+                summary.defined_tags = mysql_instance.defined_tags
+                summary.freeform_tags = mysql_instance.freeform_tags
+                summary.identifier = mysql_instance.id
+                summary.lifecycle_state = mysql_instance.lifecycle_state
+                summary.display_name = mysql_instance.display_name
+                summary.resource_type = "MysqlDBInstance"
+                result.items.append(summary)
+
+        MakeLog("")
 
     #################################################################
     # All the items with a schedule are now collected.
@@ -645,6 +653,7 @@ def autoscale_region(region):
             ###################################################################################
             # if schedule validated, let see if we can apply the new schedule to the resource
             ###################################################################################
+
             if ActiveSchedule != "":
                 DisplaySchedule = ""
                 c = 0
@@ -1453,6 +1462,7 @@ parser.add_argument('-rg', default="", dest='filter_region', help='Filter Region
 parser.add_argument('-ic', default="", dest='compartment_include', help='Include Compartment OCID')
 parser.add_argument('-ec', default="", dest='compartment_exclude', help='Exclude Compartment OCID')
 parser.add_argument('-ignrtime', action='store_true', default=False, dest='ignore_region_time', help='Ignore Region Time - Use Host Time')
+parser.add_argument('-ignoremysql', action='store_true', default=False, dest='ignoremysql', help='Ignore MYSQL processing')
 parser.add_argument('-printocid', action='store_true', default=False, dest='print_ocid', help='Print OCID for resources')
 parser.add_argument('-topic', default="", dest='topic', help='Topic to send summary in home region')
 
