@@ -521,7 +521,7 @@ def autoscale_region(region):
     #################################################################
     # Find additional resources not found by search (MySQL Service)
     #################################################################
-    if cmd.ignoremysql:
+    if not cmd.ignoremysql:
 
         MakeLog("Finding MySQL instances in {} Compartments...".format(len(compartments)))
         for c in compartments:
