@@ -287,7 +287,7 @@ else:
 
 
 def findAllCompartments():
-    query = "query compartment resources where lifeCycleState = 'ACTIVE'"
+    query = "query compartment resources where lifeCycleState = 'ACTIVE' && displayName != 'ManagedCompartmentForPaaS'"
     sdetails = oci.resource_search.models.StructuredSearchDetails()
     sdetails.query = query
     compartments = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
