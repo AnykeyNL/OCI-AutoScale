@@ -4,6 +4,25 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
+# NEW - April 25th 2021
+- Support running on all regions 
+- Added flags as parameters for execution:
+
+```
+   -t config  - Config file section to use (tenancy profile)
+   -ip        - Use Instance Principals for Authentication
+   -dt        - Use Instance Principals with delegation token for cloud shell
+   -a         - Action - All,Up,Down (Default All)
+   -tag       - Tag to use (Default Schedule)
+   -rg        - Filter on Region
+   -ic        - include compartment ocid
+   -ec        - exclude compartment ocid
+   -ignrtime  - ignore region time zone (Use host time)
+   -printocid - print ocid of resource
+   -topic     - topic to sent summary (in home region)
+   -h         - help
+```
+
 # NEW
 - Support for MySQL service added
 - Support for GoldenGate service added
