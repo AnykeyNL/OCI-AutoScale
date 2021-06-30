@@ -23,7 +23,6 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
    -h         - help
 ```
 
-# NEW
 - Support for MySQL service added
 - Support for GoldenGate service added
 - Bug fix for DB RAC instances, now both nodes are shutdown / started
