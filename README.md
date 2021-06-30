@@ -4,6 +4,25 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
+# NEW 
+- Support running on all regions 
+- Added flags as parameters for execution:
+
+```
+   -t config  - Config file section to use (tenancy profile)
+   -ip        - Use Instance Principals for Authentication
+   -dt        - Use Instance Principals with delegation token for cloud shell
+   -a         - Action - All,Up,Down (Default All)
+   -tag       - Tag to use (Default Schedule)
+   -rg        - Filter on Region
+   -ic        - include compartment ocid
+   -ec        - exclude compartment ocid
+   -ignrtime  - ignore region time zone (Use host time)
+   -printocid - print ocid of resource
+   -topic     - topic to sent summary (in home region)
+   -h         - help
+```
+
 # NEW
 - Support for MySQL service added
 - Support for GoldenGate service added
@@ -14,19 +33,21 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Instance Pools: On/Off and Scaling (# of instances)
 - Database VMs: On/Off
 - Database Baremetal Servers: Scaling (# of CPUs)
-- Database Exadata CS: Scaling (# of CPUs)
+- Database Exadata CS: Scaling (# of CPUs)*
 - Autonomous Databases: On/Off and Scaling (# of CPUs)
 - Oracle Digital Assistant: On/Off
 - Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
 - Oracle Integration Service: On/Off
-- Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)*
-- MySQL Service: On/Off**
+- Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)**
+- MySQL Service: On/Off***
 - GoldenGate: On/Off
 
-*For the loadbalancer service, specify the number 10,100,400 or 8000 for each hour to set the correct shape.
+*Supports the original DB System resource model and the newer Cloud VM Cluster resource model (introduced in Nov 2020)
+
+**For the loadbalancer service, specify the number 10,100,400 or 8000 for each hour to set the correct shape.
 When changing shape, All existing connections to this load balancer will be reset during the update process and may take up to a minute, leading to potential connection loss. For non session persistent web based applications, I did not see any noticeable interruption or downtime in my own tests, but please test yourself!
 
-**MySQL Instances are not found by the search function :-( So a special routine is run to query them. 
+***MySQL Instances are not found by the search function :-( So a special routine is run to query them. 
 Also MySQL instances that are not running (Active state)) do not allow their tags to be changed/added/removed. 
 
 # Features
