@@ -4,7 +4,7 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
-# NEW - April 25th 2021
+# NEW 
 - Support running on all regions 
 - Added flags as parameters for execution:
 
