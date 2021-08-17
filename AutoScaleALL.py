@@ -38,7 +38,7 @@ import os
 AnyDay = "AnyDay"
 Weekend = "Weekend"
 WeekDay = "WeekDay"
-Version = "2021.05.05"
+Version = "2021.08.17"
 
 # ============== CONFIGURE THIS SECTION ======================
 # OCI Configuration
@@ -636,19 +636,22 @@ def autoscale_region(region):
             #################################################################
             # Check if the active schedule contains exactly 24 numbers for each hour of the day
             #################################################################
-            try:
-                schedulehours = ActiveSchedule.split(",")
-                if len(schedulehours) != 24:
+            if ActiveSchedule != "":
+                try:
+                    schedulehours = ActiveSchedule.split(",")
+                    if len(schedulehours) != 24:
+                        ErrorsFound = True
+                        errors.append(" - Error with schedule of {} - {}, not correct amount of hours, I count {}".format(resource.display_name, ActiveSchedule, len(schedulehours)))
+                        MakeLog(" - Error with schedule of {} - {}, not correct amount of hours, i count {}".format(resource.display_name, ActiveSchedule, len(schedulehours)))
+                        ActiveSchedule = ""
+                except Exception:
                     ErrorsFound = True
-                    errors.append(" - Error with schedule of {} - {}, not correct amount of hours, I count {}".format(resource.display_name, ActiveSchedule, len(schedulehours)))
-                    MakeLog(" - Error with schedule of {} - {}, not correct amount of hours, i count {}".format(resource.display_name, ActiveSchedule, len(schedulehours)))
                     ActiveSchedule = ""
-            except Exception:
-                ErrorsFound = True
-                ActiveSchedule = ""
-                errors.append(" - Error with schedule for {}".format(resource.display_name))
-                MakeLog(" - Error with schedule of {}".format(resource.display_name))
-                MakeLog(sys.exc_info()[0])
+                    errors.append(" - Error with schedule for {}".format(resource.display_name))
+                    MakeLog(" - Error with schedule of {}".format(resource.display_name))
+                    MakeLog(sys.exc_info()[0])
+            else:
+                MakeLog(" - Ignoring instance, as no active schedule for today found")
 
             ###################################################################################
             # if schedule validated, let see if we can apply the new schedule to the resource
