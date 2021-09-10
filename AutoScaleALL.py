@@ -616,6 +616,9 @@ def autoscale_region(region):
         if resource.resource_type == "GoldenGateDeployment":
             resourceDetails = goldengate.get_deployment(deployment_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
             resourceOk = True
+        if resource.resource_type == "DISWorkspace":
+            resourceDetails = dataintegration.get_workspace(workspace_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+            resourceOk = True
 
         if not isDeleted(resource.lifecycle_state) and resourceOk:
             schedule = resourceDetails.defined_tags[PredefinedTag]
@@ -1442,6 +1445,58 @@ def autoscale_region(region):
                                                 errors.append(" - Error ({}) GoldenGate startup for {} - {}".format(response.status, resource.display_name, response.message))
                                                 Retry = False
 
+                    ###################################################################################
+                    # Data Integration Workshop
+                    ###################################################################################
+                    if resource.resource_type == "DISWorkspace":
+                        if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
+                            if resourceDetails.lifecycle_state == "ACTIVE" and int(
+                                    schedulehours[CurrentHour]) == 0:
+                                if Action == "All" or Action == "Down":
+                                    MakeLog(" - Initiate Data Integration Workspace shutdown for {}".format(resource.display_name))
+                                    Retry = True
+                                    while Retry:
+                                        try:
+                                            response = dataintegration.stop_workspace(workspace_id=resource.identifier)
+                                            Retry = False
+                                            success.append(" - Initiate Data Integration Workspace shutdown for {}".format(
+                                                resource.display_name))
+                                        except oci.exceptions.ServiceError as response:
+                                            if response.status == 429:
+                                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(
+                                                    RateLimitDelay))
+                                                time.sleep(RateLimitDelay)
+                                            else:
+                                                ErrorsFound = True
+                                                errors.append(
+                                                    " - Error ({}) Data Integration Workspace Shutdown for {} - {}".format(
+                                                        response.status, resource.display_name, response.message))
+                                                MakeLog(" - Error ({}) Data Integration Shutdown for {} - {}".format(
+                                                    response.status, resource.display_name, response.message))
+                                                Retry = False
+
+                            if resourceDetails.lifecycle_state == "STOPPED" and int(
+                                    schedulehours[CurrentHour]) == 1:
+                                if Action == "All" or Action == "Up":
+                                    MakeLog(" - Initiate Data Integration Workspace startup for {}".format(resource.display_name))
+                                    Retry = True
+                                    while Retry:
+                                        try:
+                                            response = dataintegration.start_workspace(workspace_id=resource.identifier)
+                                            Retry = False
+                                            success.append(" - Initiate Data Integration Workspace startup for {}".format(
+                                                resource.display_name))
+                                        except oci.exceptions.ServiceError as response:
+                                            if response.status == 429:
+                                                MakeLog("Rate limit kicking in.. waiting {} seconds...".format(
+                                                    RateLimitDelay))
+                                                time.sleep(RateLimitDelay)
+                                            else:
+                                                ErrorsFound = True
+                                                errors.append(" - Error ({}) Data Integration Startup startup for {} - {}".format(
+                                                    response.status, resource.display_name, response.message))
+                                                Retry = False
+
     ###################################################################################
     # Wait for any AutonomousDB and Instance Pool Start and rescale tasks completed
     ###################################################################################
@@ -1562,6 +1617,7 @@ for region_name in [str(es.region_name) for es in regions]:
     loadbalancer = oci.load_balancer.LoadBalancerClient(config, signer=signer)
     mysql = oci.mysql.DbSystemClient(config, signer=signer)
     goldengate = oci.golden_gate.GoldenGateClient(config, signer=signer)
+    dataintegration = oci.data_integration.DataIntegrationClient(config, signer=signer)
 
     ###############################################
     # Run Scale Region

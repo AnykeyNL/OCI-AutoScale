@@ -40,6 +40,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)**
 - MySQL Service: On/Off***
 - GoldenGate: On/Off
+- Data Integration Workspaces: On/Off
 
 *Supports the original DB System resource model and the newer Cloud VM Cluster resource model (introduced in Nov 2020)
 
