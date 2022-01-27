@@ -549,6 +549,7 @@ def autoscale_region(region):
                 ).data
             except Exception:
                 MakeLog("e", True)
+                mysql_instances = []
                 continue
 
             MakeLog(".", True)
