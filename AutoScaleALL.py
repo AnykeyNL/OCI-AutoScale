@@ -518,13 +518,21 @@ def autoscale_region(region):
     sdetails.query = query
 
     NoError = True
+    Attempt = True
 
-    try:
-        result = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-    except oci.exceptions.ServiceError as response:
-        print ("Error: {} - {}".format(response.code, response.message))
-        result = oci.resource_search.models.ResourceSummaryCollection()
-        result.items = []
+    if Attempt:
+        try:
+            result = search.search_resources(search_details=sdetails, limit=1000).data
+            Attempt = False
+        except oci.exceptions.ServiceError as response:
+            if response.code == 429:
+                time.sleep(5)
+                print ("api rate limit... delaying..")
+                Attempt = True
+            else:
+                print ("Error: {} - {}".format(response.code, response.message))
+                result = oci.resource_search.models.ResourceSummaryCollection()
+                result.items = []
 
     #################################################################
     # Find additional resources not found by search (MySQL Service)
