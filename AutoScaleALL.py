@@ -516,11 +516,14 @@ def autoscale_region(region):
     query += " && compartmentId != '" + compartment_exclude + "'" if compartment_exclude else ""
     sdetails = oci.resource_search.models.StructuredSearchDetails()
     sdetails.query = query
+
+    NoError = True
+
     try:
         result = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
     except oci.exceptions.ServiceError as response:
         print ("Error: {} - {}".format(response.code, response.message))
-        result = []
+        result.items = []
 
     #################################################################
     # Find additional resources not found by search (MySQL Service)
@@ -575,6 +578,7 @@ def autoscale_region(region):
     # All the items with a schedule are now collected.
     # Let's go thru them and find / validate the correct schedule
     #################################################################
+
     total_resources += len(result.items)
 
     MakeLog("")
