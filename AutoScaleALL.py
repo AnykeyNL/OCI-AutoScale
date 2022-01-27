@@ -524,6 +524,7 @@ def autoscale_region(region):
     except oci.exceptions.ServiceError as response:
         print ("Error: {} - {}".format(response.code, response.message))
         result = oci.resource_search.models.ResourceSummaryCollection()
+        result.items = []
 
     #################################################################
     # Find additional resources not found by search (MySQL Service)
