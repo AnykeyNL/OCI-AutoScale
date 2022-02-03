@@ -41,6 +41,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - MySQL Service: On/Off***
 - GoldenGate: On/Off
 - Data Integration Workspaces: On/Off
+- Visual Builder (v2 Native OCI version): On/Off
 
 *Supports the original DB System resource model and the newer Cloud VM Cluster resource model (introduced in Nov 2020)
 
