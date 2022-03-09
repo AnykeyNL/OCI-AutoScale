@@ -4,12 +4,77 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
+# NEW 
+- Support running on all regions 
+- Added flags as parameters for execution:
+
+```
+   -t config  - Config file section to use (tenancy profile)
+   -ip        - Use Instance Principals for Authentication
+   -dt        - Use Instance Principals with delegation token for cloud shell
+   -a         - Action - All,Up,Down (Default All)
+   -tag       - Tag to use (Default Schedule)
+   -rg        - Filter on Region
+   -ic        - include compartment ocid
+   -ec        - exclude compartment ocid
+   -ignrtime  - ignore region time zone (Use host time)
+   -printocid - print ocid of resource
+   -topic     - topic to sent summary (in home region)
+   -h         - help
+```
+
+- Support for MySQL service added
+- Support for GoldenGate service added
+- Bug fix for DB RAC instances, now both nodes are shutdown / started
+
 # Supported services
 - Compute VMs: On/Off
 - Instance Pools: On/Off and Scaling (# of instances)
 - Database VMs: On/Off
 - Database Baremetal Servers: Scaling (# of CPUs)
-- Autonomous Database: On/Off and Scaling (# of CPUs)
+- Database Exadata CS: Scaling (# of CPUs)*
+- Autonomous Databases: On/Off and Scaling (# of CPUs)
+- Oracle Digital Assistant: On/Off
+- Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
+- Oracle Integration Service: On/Off
+- Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)**
+- MySQL Service: On/Off***
+- GoldenGate: On/Off
+- Data Integration Workspaces: On/Off
+- Visual Builder (v2 Native OCI version): On/Off
+
+*Supports the original DB System resource model and the newer Cloud VM Cluster resource model (introduced in Nov 2020)
+
+**For the loadbalancer service, specify the number 10,100,400 or 8000 for each hour to set the correct shape.
+When changing shape, All existing connections to this load balancer will be reset during the update process and may take up to a minute, leading to potential connection loss. For non session persistent web based applications, I did not see any noticeable interruption or downtime in my own tests, but please test yourself!
+
+***MySQL Instances are not found by the search function :-( So a special routine is run to query them. 
+Also MySQL instances that are not running (Active state)) do not allow their tags to be changed/added/removed. 
+
+# Features
+- Support for using the script with Instance Principle. Meaning you can run this script inside OCI and when configured properly, you do not need to provide any details or credentials.
+- Support for sending Notification after script is done. Thanks to Joel Nation for this! All you need to do is configure the Topic OCID in the script and make sure the user or instance principle has the correct permissions to publish Notifications.
+
+# Install script into (free-tier) Autonomous Linux Instance
+Youtube demonstration video: https://youtu.be/veHbyvDB74A
+
+- Create a free-tier compute instance using the Autonomous Linux 7.8 image
+- Create a Dynamic Group called Autoscaling and add the OCID of your instance to the group, using this command:
+  - ANY {instance.id = 'your_OCID_of_your_Compute_Instance'}
+- Create a root level policy, giving your dynamic group permission to manage all resources in tenancy:
+  - allow dynamic-group Autoscaling to manage all-resources in tenancy
+- Login to your instance using an SSH connection
+- run the following commands:
+  - wget https://raw.githubusercontent.com/AnykeyNL/OCI-AutoScale/master/install.sh
+  - bash install.sh
+- If this is the first time you are using the Autoscaling script, go to the OCI-Autoscale directory and run the following command:
+  - python3 CreateNameSpaces.py
+
+The Install script will configure the time zone to European Central Time (CET). If you want to operate in a difference timezone, run the command:
+- sudo timedatectl set-timezone Europe/Amsterdam
+
+The instance is now all setup and will run 2 minutes before the hour all scaling down/power down operations 
+and 1 minute after the hour scaling up/power on operations.
 
 # How to use
 To control what to scale up/down or power on/off, you need to create a predefined tag called **Schedule**. If you want to
@@ -17,7 +82,12 @@ localize this, that is possible in the script. For the predefined tag, you need 
 
 A single resource can contain multiple tags. A Weekend/Weekday tag overrules an AnyDay tag. A specific day of the week tag (ie. Monday) overrules all other tags.
 
-The value of the tag needs to contain 24 numbers (else it is ignored), seperated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
+The value of the tag needs to contain 24 numbers and/or wildcards (*) (else it is ignored), separated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
+
+When a wild card is used, the service will stay unmodified for that hour. For example, the below schedule will turn of a compute instance in the evening/night, but allows the user to manage the state during the day.
+
+Schedule.AnyDay : 0,0,0,0,0,0,0,0,\*,\*,\*,\*,\*,\*,\*,\*,0,0,0,0,0,0,0,0
+
 
 ![Scaling Example Instance Pool](http://oc-blog.com/wp-content/uploads/2019/06/ScaleExamplePool.png)
 
@@ -36,15 +106,5 @@ To ensure the script runs as fast as possible, all blocking operations (power on
 
 You can deploy this script anywhere you like as long as the location has internet access to the OCI API services. 
 
-# Single service Autoscaling Scripts:
-- **AutoscaleDBBM;** this script is designed to run inside the Baremetal instances running the Oracle Database Cloud Service and Schedule itself up/down based on the schedule.
-- **Autoscale_AWD_ATP;** this script is designed to scale ALL ADW and ATP services that have a valid Schedule tag. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise. When 0 is specified the service will be turned off.
-- **AutoScaleCompute;** this script is designed to automatically power on / off compute instances based on the hour of the day. You need to run this script somewere that has internet access so it can talk to the Oracle Cloud API. This can be in the cloud or on-premise.
-
-# More information
-Please check www.oc-blog.com
-
 ## Disclaimer
-This is a personal repository. Any code, views or opinions represented here are personal and belong solely to me and do not represent those of people, institutions or organizations that I may or may not be associated with in professional or personal capacity, unless explicitly stated.
-
 **Please test properly on test resources, before using it on production resources to prevent unwanted outages or very expensive bills.**

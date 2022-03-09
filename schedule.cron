@@ -1,0 +1,2 @@
+58 * * * * python3 /home/opc/OCI-AutoScale/AutoScaleALL.py -a Down
+01 * * * * python3 /home/opc/OCI-AutoScale/AutoScaleALL.py -a Up
