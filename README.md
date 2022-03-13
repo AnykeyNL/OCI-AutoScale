@@ -69,7 +69,7 @@ Youtube demonstration video: https://youtu.be/veHbyvDB74A
   - wget https://raw.githubusercontent.com/AnykeyNL/OCI-AutoScale/master/install.sh
   - bash install.sh
 - If this is the first time you are using the Autoscaling script, go to the OCI-Autoscale directory and run the following command:
-  - python3 CreateNameSpaces.py
+  - python3 CreateNameSpaces.py -ip
 
 The Install script will configure the time zone to European Central Time (CET). If you want to operate in a difference timezone, run the command:
 - sudo timedatectl set-timezone Europe/Amsterdam
