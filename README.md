@@ -5,6 +5,7 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW 
+- Support for a Day of the Month Schedule (Like 1st of the month or 15th of the month)
 - Support running on all regions 
 - Added flags as parameters for execution:
 
@@ -80,14 +81,27 @@ and 1 minute after the hour scaling up/power on operations.
 To control what to scale up/down or power on/off, you need to create a predefined tag called **Schedule**. If you want to
 localize this, that is possible in the script. For the predefined tag, you need entries for the days of the week, weekdays, weekends and anyday. The tags names are case sensitive! 
 
-A single resource can contain multiple tags. A Weekend/Weekday tag overrules an AnyDay tag. A specific day of the week tag (ie. Monday) overrules all other tags.
+A single resource can contain multiple tags. The priority of tags is as followed (from low to high) 
+- Anyday
+- Weekday or Weekend
+- Day of the week (Like Monday, Tuesday...)
+- Day of the month (Example 1 = 1st or 15 = 15th of the month)
 
+### Values for the AnyDay, Weekday, Weekend and Day of week tags:
 The value of the tag needs to contain 24 numbers and/or wildcards (*) (else it is ignored), separated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
 
 When a wild card is used, the service will stay unmodified for that hour. For example, the below schedule will turn of a compute instance in the evening/night, but allows the user to manage the state during the day.
 
 Schedule.AnyDay : 0,0,0,0,0,0,0,0,\*,\*,\*,\*,\*,\*,\*,\*,0,0,0,0,0,0,0,0
 
+### Values for DayOfMonth tags
+The DayOfMonth tag allows to set a resource on a specific day of the month. This can be specified by day:size
+
+For each day <b>Only one value</b> can be specified! This value is valid for all hours of that day
+
+The below example tag schedules the resource on the 1st of the month to 4, on the 3rd of the month to 2 and on the 28th of the month back to 5:
+
+Schedule.DayOfMonth : 1:4,3:2,28:4
 
 ![Scaling Example Instance Pool](http://oc-blog.com/wp-content/uploads/2019/06/ScaleExamplePool.png)
 
