@@ -50,7 +50,7 @@ MakeLog("Home Region   : " + tenancy_home_region)
 details = oci.identity.models.CreateTagNamespaceDetails()
 
 details.compartment_id = tenancy.id
-details.name = "ScheduleT2"
+details.name = "Schedule"
 details.description = "Namespace for schedule tags"
 
 MakeLog("Creating Namespace Schedule")
