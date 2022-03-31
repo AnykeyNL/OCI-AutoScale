@@ -1,7 +1,7 @@
 #!/home/opc/py36env/bin/python
 #################################################################################################################
 # OCI - Scheduled Auto Scaling Script
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.  All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.  All rights reserved.
 # This software is licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
 #
 # Written by: Richard Garsthagen
@@ -33,12 +33,15 @@ import time
 import sys
 import argparse
 import os
+import Regions
+import OCIFunctions
 
 # You can modify / translate the tag names used by this script - case sensitive!!!
 AnyDay = "AnyDay"
 Weekend = "Weekend"
 WeekDay = "WeekDay"
-Version = "2022.02.03"
+DayOfMonth = "DayOfMonth"
+Version = "2022.03.13"
 
 # ============== CONFIGURE THIS SECTION ======================
 # OCI Configuration
@@ -73,76 +76,13 @@ def print_header(name):
 # Get Current Hour per the region
 ##########################################################################
 def get_current_hour(region, ignore_region_time=False):
-    if region[:2] == 'eu':
-        timezdiff = 2
-    elif region[:2] == 'uk':
-        timezdiff = 0
-    elif region == 'af-johannesburg-1':
-        timezdiff = 2
-    elif region == 'ap-chiyoda-1':
-        timezdiff = 9
-    elif region == 'ap-chuncheon-1':
-        timezdiff = 9
-    elif region == 'ap-hyderabad-1':
-        timezdiff = 5.5
-    elif region == 'ap-melbourne-1':
-        timezdiff = 10
-    elif region == 'ap-mumbai-1':
-        timezdiff = 5.5
-    elif region == 'ap-osaka-1':
-        timezdiff = 9
-    elif region == 'ap-seoul-1':
-        timezdiff = 9
-    elif region == 'ap-singapore-1':
-        timezdiff = 8
-    elif region == 'ap-sydney-1':
-        timezdiff = 10
-    elif region == 'ap-tokyo-1':
-        timezdiff = 9
-    elif region == 'ca-montreal-1':
-        timezdiff = -4
-    elif region == 'ca-toronto-1':
-        timezdiff = -4
-    elif region == 'il-jerusalem-1':
-        timezdiff = 3
-    elif region == 'me-abudhabi-1':
-        timezdiff = 4
-    elif region == 'me-dubai-1':
-        timezdiff = 4
-    elif region == 'me-jeddah-1':
-        timezdiff = 3
-    elif region == 'sa-santiago-1':
-        timezdiff = -4
-    elif region == 'sa-saopaulo-1':
-        timezdiff = -3
-    elif region == 'sa-vinhedo-1':
-        timezdiff = -3
-    elif region == 'us-ashburn-1':
-        timezdiff = -4
-    elif region == 'us-gov-ashburn-1':
-        timezdiff = -4
-    elif region == 'us-gov-chicago-1':
-        timezdiff = -5
-    elif region == 'us-gov-fortworth-1':
-        timezdiff = -5
-    elif region == 'us-gov-fortworth-2':
-        timezdiff = -5
-    elif region == 'us-gov-phoenix-1':
-        timezdiff = -7
-    elif region == 'us-gov-sterling-1 ':
-        timezdiff = -4
-    elif region == 'us-gov-sterling-2':
-        timezdiff = -4
-    elif region == 'us-langley-1':
-        timezdiff = -5
-    elif region == 'us-luke-1':
-        timezdiff = -7
-    elif region == 'us-phoenix-1':
-        timezdiff = -7
-    elif region == 'us-sanjose-1':
-        timezdiff = -7
-    else:
-        timezdiff = 0
+
+    timezdiff = 0  # Default value if no region match is found
+
+    # Find matching time zone for region
+    for r in Regions.RegionTime:
+        if r[0] == region:
+            timezdiff = r[1]
 
     # Get current host time
     current_time = current_host_time
@@ -150,83 +90,17 @@ def get_current_hour(region, ignore_region_time=False):
     # if need to use region time
     if not ignore_region_time:
         current_time = current_utc_time + datetime.timedelta(hours=timezdiff)
+        print ("Debug: {}".format(current_time))
 
     # get the variables to return
     iDayOfWeek = current_time.weekday()  # Day of week as a number
     iDay = calendar.day_name[iDayOfWeek]  # Day of week as string
     iCurrentHour = current_time.hour
+    iDayOfMonth = current_time.date().day # Day of the month as a number
 
-    return iDayOfWeek, iDay, iCurrentHour
+    return iDayOfWeek, iDay, iCurrentHour, iDayOfMonth
 
 
-##########################################################################
-# Create signer for Authentication
-# Input - config_profile and is_instance_principals and is_delegation_token
-# Output - config and signer objects
-##########################################################################
-def create_signer(config_profile, is_instance_principals, is_delegation_token):
-
-    # if instance principals authentications
-    if is_instance_principals:
-        try:
-            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-            config = {'region': signer.region, 'tenancy': signer.tenancy_id}
-            return config, signer
-
-        except Exception:
-            print_header("Error obtaining instance principals certificate, aborting")
-            raise SystemExit
-
-    # -----------------------------
-    # Delegation Token
-    # -----------------------------
-    elif is_delegation_token:
-
-        try:
-            # check if env variables OCI_CONFIG_FILE, OCI_CONFIG_PROFILE exist and use them
-            env_config_file = os.environ.get('OCI_CONFIG_FILE')
-            env_config_section = os.environ.get('OCI_CONFIG_PROFILE')
-
-            # check if file exist
-            if env_config_file is None or env_config_section is None:
-                MakeLog("*** OCI_CONFIG_FILE and OCI_CONFIG_PROFILE env variables not found, abort. ***")
-                MakeLog("")
-                raise SystemExit
-
-            config = oci.config.from_file(env_config_file, env_config_section)
-            delegation_token_location = config["delegation_token_file"]
-
-            with open(delegation_token_location, 'r') as delegation_token_file:
-                delegation_token = delegation_token_file.read().strip()
-                # get signer from delegation token
-                signer = oci.auth.signers.InstancePrincipalsDelegationTokenSigner(delegation_token=delegation_token)
-
-                return config, signer
-
-        except KeyError:
-            MakeLog("* Key Error obtaining delegation_token_file")
-            raise SystemExit
-
-        except Exception:
-            raise
-
-    # -----------------------------
-    # config file authentication
-    # -----------------------------
-    else:
-        config = oci.config.from_file(
-            oci.config.DEFAULT_LOCATION,
-            (config_profile if config_profile else oci.config.DEFAULT_PROFILE)
-        )
-        signer = oci.signer.Signer(
-            tenancy=config["tenancy"],
-            user=config["user"],
-            fingerprint=config["fingerprint"],
-            private_key_file_location=config.get("key_file"),
-            pass_phrase=oci.config.get_config_value_or_default(config, "pass_phrase"),
-            private_key_content=config.get("key_content")
-        )
-        return config, signer
 
 
 ##########################################################################
@@ -495,17 +369,18 @@ def autoscale_region(region):
     ###############################################
     # Get Current Day, time
     ###############################################
-    DayOfWeek, Day, CurrentHour = get_current_hour(region, cmd.ignore_region_time)
+    DayOfWeek, Day, CurrentHour, CurrentDayOfMonth = get_current_hour(region, cmd.ignore_region_time)
 
     if AlternativeWeekend:
         MakeLog("Using Alternative weekend (Friday and Saturday as weekend")
     if cmd.ignore_region_time:
         MakeLog("Ignoring Region Datetime, Using local time")
 
-    MakeLog("Day of week: {}, IsWeekday: {},  Current hour: {}".format(Day, isWeekDay(DayOfWeek), CurrentHour))
+    MakeLog("Day of week: {}, IsWeekday: {},  Current hour: {},  Current DayOfMonth: {}".format(Day, isWeekDay(DayOfWeek), CurrentHour, CurrentDayOfMonth))
 
+    # Investigatin BUG: temporary disabling below logic
     # Array start with 0 so decrease CurrentHour with 1, if hour = 0 then 23
-    CurrentHour = 23 if CurrentHour == 0 else CurrentHour - 1
+    #CurrentHour = 23 if CurrentHour == 0 else CurrentHour - 1
 
     ###############################################
     # Find all resources with a Schedule Tag
@@ -637,6 +512,14 @@ def autoscale_region(region):
             schedule = resourceDetails.defined_tags[PredefinedTag]
             ActiveSchedule = ""
 
+            # Checking the right schedule based on priority
+            # from low to high:
+            #
+            # - Anyday
+            # - WeekDay or Weekend
+            # - Name of Day (Monday, Tuesday....)
+            # - Day of month
+
             if AnyDay in schedule:
                 ActiveSchedule = schedule[AnyDay]
             if isWeekDay(DayOfWeek):  # check for weekday / weekend
@@ -648,6 +531,13 @@ def autoscale_region(region):
 
             if Day in schedule:  # Check for day specific tag (today)
                 ActiveSchedule = schedule[Day]
+
+            if DayOfMonth in schedule:
+                specificDays = schedule[DayOfMonth].split(",")
+                for specificDay in specificDays:
+                    day, schedulesize = specificDay.split(":")
+                    if int(day) == CurrentDayOfMonth:
+                        ActiveSchedule = ("{},".format(schedulesize)*24)[:-1]
 
             #################################################################
             # Check if the active schedule contains exactly 24 numbers for each hour of the day
@@ -1610,7 +1500,7 @@ start_time = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 print_header("Running Auto Scale")
 
 # Identity extract compartments
-config, signer = create_signer(cmd.config_profile, cmd.is_instance_principals, cmd.is_delegation_token)
+config, signer = OCIFunctions.create_signer(cmd.config_profile, cmd.is_instance_principals, cmd.is_delegation_token)
 compartments = []
 tenancy = None
 tenancy_home_region = ""

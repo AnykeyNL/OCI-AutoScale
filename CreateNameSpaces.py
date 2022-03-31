@@ -1,7 +1,7 @@
 #!/home/opc/py36env/bin/python
 # OCI - Create Namespace and key tags for Auto Scaling Script
 #
-# Copyright (c) 2016, 2020, Oracle and/or its affiliates.  All rights reserved.
+# Copyright (c) 2016, 2022, Oracle and/or its affiliates.  All rights reserved.
 # This software is licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
 #
 # Written by: Richard Garsthagen
@@ -10,68 +10,65 @@
 # This script is designed to run inside an OCI instance, assigned with the right permissions to manage the tenancy
 
 import oci
-import requests
-
-signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-
-UseInstancePrinciple = True
+#import requests
+import argparse
+import OCIFunctions
+import datetime
 
 def MakeLog(msg):
     print (msg)
 
-if UseInstancePrinciple:
-    userName = "Instance Principle"
-    try:
-        url = "http://169.254.169.254/opc/v1/instance/"
-        data = requests.get(url).json()
-    except:
-        MakeLog("This instance is not running on OCI or does not have Instance Principle permissions")
-        exit()
-    region = data['region']
-    compID = data['compartmentId']
-    if compID[:14] == "ocid1.tenancy.":
-       RootCompartmentID = compID
-       SearchRootID = False
-    else:
-       SearchRootID = True
-    SearchCompID = compID
 
-    identity = oci.identity.IdentityClient(config={}, signer=signer)
+##########################################################################
+# Main
+##########################################################################
+# Get Command Line Parser
+parser = argparse.ArgumentParser()
+parser.add_argument('-t', default="", dest='config_profile', help='Config file section to use (tenancy profile)')
+parser.add_argument('-ip', action='store_true', default=False, dest='is_instance_principals', help='Use Instance Principals for Authentication')
+parser.add_argument('-dt', action='store_true', default=False, dest='is_delegation_token', help='Use Delegation Token for Authentication')
 
-    while SearchRootID:
-        compartment = identity.get_compartment(compartment_id=SearchCompID).data
-        if compartment.compartment_id[:14] == "ocid1.tenancy.":
-            RootCompartmentID = compartment.compartment_id
-            SearchRootID = False
-        else:
-            SearchCompID = compartment.compartment_id
+cmd = parser.parse_args()
 
-    Tenancy = identity.get_tenancy(tenancy_id=RootCompartmentID).data
-    MakeLog("Logged in as: {}/{} @ {}".format(userName, Tenancy.name, region))
+config, signer = OCIFunctions.create_signer(cmd.config_profile, cmd.is_instance_principals, cmd.is_delegation_token)
 
-    details = oci.identity.models.CreateTagNamespaceDetails()
+MakeLog("Starts at " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+MakeLog("\nConnecting to Identity Service...")
+identity = oci.identity.IdentityClient(config, signer=signer)
+tenancy = identity.get_tenancy(config["tenancy"]).data
+regions = identity.list_region_subscriptions(tenancy.id).data
 
-    details.compartment_id = RootCompartmentID
-    details.name = "Schedule"
-    details.description = "Namespace for schedule tags"
+for reg in regions:
+    if reg.is_home_region:
+        tenancy_home_region = str(reg.region_name)
 
-    print("Creating Namespace Schedule")
-    response = identity.create_tag_namespace(create_tag_namespace_details=details).data
-    namespaceID = response.id
+MakeLog("")
+MakeLog("Tenant Name   : " + str(tenancy.name))
+MakeLog("Tenant Id     : " + tenancy.id)
+MakeLog("Home Region   : " + tenancy_home_region)
 
-    keys = ["AnyDay", "WeekDay", "Weekend", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+details = oci.identity.models.CreateTagNamespaceDetails()
 
-    print("Creating keys Schedule")
-    for key in keys:
-        keydetails = oci.identity.models.CreateTagDetails()
-        keydetails.name = key
-        keydetails.description = "Schedule for {}".format(key)
-        response = identity.create_tag(tag_namespace_id=namespaceID, create_tag_details=keydetails)
+details.compartment_id = tenancy.id
+details.name = "Schedule"
+details.description = "Namespace for schedule tags"
 
-    print ("Namespace and keys for scheduling have been created")
+MakeLog("Creating Namespace Schedule")
+response = identity.create_tag_namespace(create_tag_namespace_details=details).data
+namespaceID = response.id
 
-else:
-    print ("This script is designed to run inside OCI using Instance principal permissions")
+keys = ["AnyDay", "WeekDay", "Weekend", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "DayOfMonth"]
+
+MakeLog("Creating keys Schedule")
+for key in keys:
+    keydetails = oci.identity.models.CreateTagDetails()
+    keydetails.name = key
+    keydetails.description = "Schedule for {}".format(key)
+    response = identity.create_tag(tag_namespace_id=namespaceID, create_tag_details=keydetails, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
+    MakeLog("Key {} is created".format(key))
+
+MakeLog("")
+MakeLog ("Namespace and keys for scheduling have been created")
 
 
 
