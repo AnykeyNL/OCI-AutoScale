@@ -544,7 +544,7 @@ def autoscale_region(region):
             #################################################################
             if ActiveSchedule != "":
                 try:
-                    schedulehours = ActiveSchedule.split(",")
+                    schedulehours = ActiveSchedule.split("#")[0].split(",")
                     if len(schedulehours) != 24:
                         ErrorsFound = True
                         errors.append(" - Error with schedule of {} - {}, not correct amount of hours, I count {}".format(resource.display_name, ActiveSchedule, len(schedulehours)))
