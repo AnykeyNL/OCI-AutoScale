@@ -60,7 +60,6 @@ RateLimitDelay = 2  # Time in seconds to wait before retry of operation
 current_host_time = datetime.datetime.today()
 current_utc_time = datetime.datetime.utcnow()
 
-
 ##########################################################################
 # Print header centered
 ##########################################################################
@@ -98,9 +97,20 @@ def get_current_hour(region, ignore_region_time=False):
     iCurrentHour = current_time.hour
     iDayOfMonth = current_time.date().day # Day of the month as a number
 
-    return iDayOfWeek, iDay, iCurrentHour, iDayOfMonth
+    # Get what N-th day of the monday it is. Like 1st, 2nd, 3rd Saturday
+    cal = calendar.monthcalendar(current_time.year, current_time.month)
+    iDayNr = 0
+    daynrcounter = 0
+    for week in cal:
+        if cal[daynrcounter][iDayOfWeek] == current_time.day:
+            if cal[0][iDayOfWeek]:
+                iDayNr = daynrcounter + 1
+            else:
+                iDayNr = daynrcounter
 
+        daynrcounter = daynrcounter + 1
 
+    return iDayOfWeek, iDay, iCurrentHour, iDayOfMonth, iDayNr
 
 
 ##########################################################################
@@ -369,14 +379,14 @@ def autoscale_region(region):
     ###############################################
     # Get Current Day, time
     ###############################################
-    DayOfWeek, Day, CurrentHour, CurrentDayOfMonth = get_current_hour(region, cmd.ignore_region_time)
+    DayOfWeek, Day, CurrentHour, CurrentDayOfMonth, DayNr = get_current_hour(region, cmd.ignore_region_time)
 
     if AlternativeWeekend:
         MakeLog("Using Alternative weekend (Friday and Saturday as weekend")
     if cmd.ignore_region_time:
         MakeLog("Ignoring Region Datetime, Using local time")
 
-    MakeLog("Day of week: {}, IsWeekday: {},  Current hour: {},  Current DayOfMonth: {}".format(Day, isWeekDay(DayOfWeek), CurrentHour, CurrentDayOfMonth))
+    MakeLog("Day of week: {}, Nth day in Month: {}, IsWeekday: {},  Current hour: {},  Current DayOfMonth: {}".format(Day, DayNr, isWeekDay(DayOfWeek), CurrentHour, CurrentDayOfMonth))
 
     # Investigatin BUG: temporary disabling below logic
     # Array start with 0 so decrease CurrentHour with 1, if hour = 0 then 23
@@ -518,6 +528,7 @@ def autoscale_region(region):
             # - Anyday
             # - WeekDay or Weekend
             # - Name of Day (Monday, Tuesday....)
+            # - Name of Day, ending with a number to indicate Nth of the month (Saturday1, Saturday2)
             # - Day of month
 
             if AnyDay in schedule:
@@ -531,6 +542,9 @@ def autoscale_region(region):
 
             if Day in schedule:  # Check for day specific tag (today)
                 ActiveSchedule = schedule[Day]
+
+            if "{}{}".format(Day, DayNr) in schedule:  # Check for Nth day of the Month
+                ActiveSchedule = schedule["{}{}".format(Day, DayNr)]
 
             if DayOfMonth in schedule:
                 specificDays = schedule[DayOfMonth].split(",")

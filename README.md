@@ -5,6 +5,7 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW 
+- Support for Nth day of the Month Scheuld (Like 1st saturday or 3rd Saturday)
 - Support for a Day of the Month Schedule (Like 1st of the month or 15th of the month)
 - Support running on all regions 
 - Added flags as parameters for execution:
@@ -103,9 +104,16 @@ The below example tag schedules the resource on the 1st of the month to 4, on th
 
 Schedule.DayOfMonth : 1:4,3:2,28:4
 
-![Scaling Example Instance Pool](http://oc-blog.com/wp-content/uploads/2019/06/ScaleExamplePool.png)
+### Values for Nth day of the Month
+If you want to have a schedule for the Nth day of the month, like 1st Saturday or 3rd Saturday, you need to add extra Tag Key definitions.
 
-![Power Off Example DB VM](http://oc-blog.com/wp-content/uploads/2019/06/ScaleExampleDB.png)
+For example, if you want to have an schedule for the 2nd Saturday of the months, create an extra Tag Key definition called **Saturday2**
+
+A specific Nth day of month schedule overwrites a normal day of the month schedule. So a **Saturday2** overwrites a **Saturday** schedule.
+
+![Scaling Example Instance Pool](http://oc-blog.com/wp-content/uploads/2022/06/Screenshot-2022-06-13-at-11.10.31.png)
+
+![Power Off Example DB VM](https://oc-blog.com/wp-content/uploads/2019/06/ScaleExampleDB.png)
 
 The script supports 3 running methods: All, Up, Down
 
