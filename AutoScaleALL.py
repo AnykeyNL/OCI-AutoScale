@@ -589,7 +589,7 @@ def autoscale_region(region):
 
                 MakeLog(" - Active schedule for {}: {}".format(resource.display_name, DisplaySchedule))
 
-                if schedulehours[CurrentHour] == "*":
+                if "*" in schedulehours[CurrentHour]:
                     MakeLog(" - Ignoring this service for this hour")
 
                 else:
