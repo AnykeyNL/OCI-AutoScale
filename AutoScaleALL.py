@@ -22,6 +22,7 @@
 #   -ignormysql- ignore mysql execution
 #   -printocid - print ocid of object
 #   -topic     - topic to sent summary
+#   -log       - send log output to OCI Logging service. Specify the Log OCID
 #   -h         - help
 #
 #################################################################################################################
@@ -35,6 +36,9 @@ import argparse
 import os
 import Regions
 import OCIFunctions
+
+logdetails = oci.loggingingestion.models.LogEntryBatch()
+logdetails.entries = []
 
 # You can modify / translate the tag names used by this script - case sensitive!!!
 AnyDay = "AnyDay"
@@ -68,6 +72,7 @@ def print_header(name):
     MakeLog('#' * chars)
     MakeLog("#" + name.center(chars - 2, " ") + "#")
     MakeLog('#' * chars)
+
 
 
 ##########################################################################
@@ -116,10 +121,16 @@ def get_current_hour(region, ignore_region_time=False):
 # Configure logging output
 ##########################################################################
 def MakeLog(msg, no_end=False):
+    global logdetails
     if no_end:
         print(msg, end="")
     else:
         print(msg)
+        logdetail = oci.loggingingestion.models.LogEntry()
+        logdetail.id = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        logdetail.data = msg
+        logdetail.time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        logdetails.entries.append(logdetail)
 
 
 ##########################################################################
@@ -1491,6 +1502,7 @@ parser.add_argument('-ignrtime', action='store_true', default=False, dest='ignor
 parser.add_argument('-ignoremysql', action='store_true', default=False, dest='ignoremysql', help='Ignore MYSQL processing')
 parser.add_argument('-printocid', action='store_true', default=False, dest='print_ocid', help='Print OCID for resources')
 parser.add_argument('-topic', default="", dest='topic', help='Topic OCID to send summary in home region')
+parser.add_argument('-log', default="", dest='log', help='Log OCID to send log output to')
 
 cmd = parser.parse_args()
 if cmd.action != "All" and cmd.action != "Down" and cmd.action != "Up":
@@ -1622,3 +1634,24 @@ if cmd.topic:
                     Retry = False
 
 MakeLog("All scaling tasks done, checked {} resources.".format(total_resources))
+
+if cmd.log:
+    config['region'] = tenancy_home_region
+    signer.region = tenancy_home_region
+    logingest = oci.loggingingestion.LoggingClient(config, signer=signer)
+    logdetails.source = "Autoscale-script"
+    logdetails.type = "Autoscale-script-output"
+    logdetails.subject = "Autoscale operations"
+    logdetails.defaultlogentrytime = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    putlogdetails = oci.loggingingestion.models.PutLogsDetails()
+    putlogdetails.specversion = "1.0"
+    putlogdetails.log_entry_batches = [logdetails]
+
+    result = logingest.put_logs(log_id=cmd.log, put_logs_details=putlogdetails)
+
+
+
+
+
+
