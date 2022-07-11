@@ -49,7 +49,6 @@ Version = "2022.03.13"
 
 ComputeShutdownMethod = "SOFTSTOP"
 LogLevel = "ALL"  # Use ALL or ERRORS. When set to ERRORS only a notification will be published if error occurs
-TopicID = ""  # Enter Topic OCID if you want the script to publish a message about the scaling actions
 
 AlternativeWeekend = False  # Set to True is your weekend is Friday/Saturday
 RateLimitDelay = 2  # Time in seconds to wait before retry of operation
@@ -1491,7 +1490,7 @@ parser.add_argument('-ec', default="", dest='compartment_exclude', help='Exclude
 parser.add_argument('-ignrtime', action='store_true', default=False, dest='ignore_region_time', help='Ignore Region Time - Use Host Time')
 parser.add_argument('-ignoremysql', action='store_true', default=False, dest='ignoremysql', help='Ignore MYSQL processing')
 parser.add_argument('-printocid', action='store_true', default=False, dest='print_ocid', help='Print OCID for resources')
-parser.add_argument('-topic', default="", dest='topic', help='Topic to send summary in home region')
+parser.add_argument('-topic', default="", dest='topic', help='Topic OCID to send summary in home region')
 
 cmd = parser.parse_args()
 if cmd.action != "All" and cmd.action != "Down" and cmd.action != "Up":

@@ -21,7 +21,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
    -ec        - exclude compartment ocid
    -ignrtime  - ignore region time zone (Use host time)
    -printocid - print ocid of resource
-   -topic     - topic to sent summary (in home region)
+   -topic     - topic OCID to sent summary (in home region)
    -h         - help
 ```
 
