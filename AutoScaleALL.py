@@ -415,7 +415,12 @@ def autoscale_region(region):
     NoError = True
 
     try:
-        result = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+        result = oci.pagination.list_call_get_all_results(search.search_resources,
+                                                          sdetails,
+                                                          **{
+                                                              "limit": 1000
+                                                          }).data
+
     except oci.exceptions.ServiceError as response:
         print ("Error: {} - {}".format(response.code, response.message))
         result = oci.resource_search.models.ResourceSummaryCollection()
@@ -475,12 +480,12 @@ def autoscale_region(region):
     # Let's go thru them and find / validate the correct schedule
     #################################################################
 
-    total_resources += len(result.items)
+    total_resources += len(result)
 
     MakeLog("")
-    MakeLog("Checking {} Resources for Auto Scale...".format(len(result.items)))
+    MakeLog("Checking {} Resources for Auto Scale...".format(total_resources))
 
-    for resource in result.items:
+    for resource in result:
         # The search data is not always updated. Get the tags from the actual resource itself, not using the search data.
         resourceOk = False
         if cmd.print_ocid:
