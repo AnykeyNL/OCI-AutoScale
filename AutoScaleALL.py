@@ -22,6 +22,7 @@
 #   -ignormysql- ignore mysql execution
 #   -printocid - print ocid of object
 #   -topic     - topic to sent summary
+#   -log       - send log output to OCI Logging service. Specify the Log OCID
 #   -h         - help
 #
 #################################################################################################################
@@ -36,6 +37,9 @@ import os
 import Regions
 import OCIFunctions
 
+logdetails = oci.loggingingestion.models.LogEntryBatch()
+logdetails.entries = []
+
 # You can modify / translate the tag names used by this script - case sensitive!!!
 AnyDay = "AnyDay"
 Weekend = "Weekend"
@@ -49,7 +53,6 @@ Version = "2022.03.13"
 
 ComputeShutdownMethod = "SOFTSTOP"
 LogLevel = "ALL"  # Use ALL or ERRORS. When set to ERRORS only a notification will be published if error occurs
-TopicID = ""  # Enter Topic OCID if you want the script to publish a message about the scaling actions
 
 AlternativeWeekend = False  # Set to True is your weekend is Friday/Saturday
 RateLimitDelay = 2  # Time in seconds to wait before retry of operation
@@ -60,7 +63,6 @@ RateLimitDelay = 2  # Time in seconds to wait before retry of operation
 current_host_time = datetime.datetime.today()
 current_utc_time = datetime.datetime.utcnow()
 
-
 ##########################################################################
 # Print header centered
 ##########################################################################
@@ -70,6 +72,7 @@ def print_header(name):
     MakeLog('#' * chars)
     MakeLog("#" + name.center(chars - 2, " ") + "#")
     MakeLog('#' * chars)
+
 
 
 ##########################################################################
@@ -98,19 +101,36 @@ def get_current_hour(region, ignore_region_time=False):
     iCurrentHour = current_time.hour
     iDayOfMonth = current_time.date().day # Day of the month as a number
 
-    return iDayOfWeek, iDay, iCurrentHour, iDayOfMonth
+    # Get what N-th day of the monday it is. Like 1st, 2nd, 3rd Saturday
+    cal = calendar.monthcalendar(current_time.year, current_time.month)
+    iDayNr = 0
+    daynrcounter = 0
+    for week in cal:
+        if cal[daynrcounter][iDayOfWeek] == current_time.day:
+            if cal[0][iDayOfWeek]:
+                iDayNr = daynrcounter + 1
+            else:
+                iDayNr = daynrcounter
 
+        daynrcounter = daynrcounter + 1
 
+    return iDayOfWeek, iDay, iCurrentHour, iDayOfMonth, iDayNr
 
 
 ##########################################################################
 # Configure logging output
 ##########################################################################
 def MakeLog(msg, no_end=False):
+    global logdetails
     if no_end:
         print(msg, end="")
     else:
         print(msg)
+        logdetail = oci.loggingingestion.models.LogEntry()
+        logdetail.id = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        logdetail.data = msg
+        logdetail.time = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        logdetails.entries.append(logdetail)
 
 
 ##########################################################################
@@ -369,14 +389,14 @@ def autoscale_region(region):
     ###############################################
     # Get Current Day, time
     ###############################################
-    DayOfWeek, Day, CurrentHour, CurrentDayOfMonth = get_current_hour(region, cmd.ignore_region_time)
+    DayOfWeek, Day, CurrentHour, CurrentDayOfMonth, DayNr = get_current_hour(region, cmd.ignore_region_time)
 
     if AlternativeWeekend:
         MakeLog("Using Alternative weekend (Friday and Saturday as weekend")
     if cmd.ignore_region_time:
         MakeLog("Ignoring Region Datetime, Using local time")
 
-    MakeLog("Day of week: {}, IsWeekday: {},  Current hour: {},  Current DayOfMonth: {}".format(Day, isWeekDay(DayOfWeek), CurrentHour, CurrentDayOfMonth))
+    MakeLog("Day of week: {}, Nth day in Month: {}, IsWeekday: {},  Current hour: {},  Current DayOfMonth: {}".format(Day, DayNr, isWeekDay(DayOfWeek), CurrentHour, CurrentDayOfMonth))
 
     # Investigatin BUG: temporary disabling below logic
     # Array start with 0 so decrease CurrentHour with 1, if hour = 0 then 23
@@ -395,7 +415,12 @@ def autoscale_region(region):
     NoError = True
 
     try:
-        result = search.search_resources(search_details=sdetails, limit=1000, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+        result = oci.pagination.list_call_get_all_results(search.search_resources,
+                                                          sdetails,
+                                                          **{
+                                                              "limit": 1000
+                                                          }).data
+
     except oci.exceptions.ServiceError as response:
         print ("Error: {} - {}".format(response.code, response.message))
         result = oci.resource_search.models.ResourceSummaryCollection()
@@ -455,12 +480,12 @@ def autoscale_region(region):
     # Let's go thru them and find / validate the correct schedule
     #################################################################
 
-    total_resources += len(result.items)
+    total_resources += len(result)
 
     MakeLog("")
-    MakeLog("Checking {} Resources for Auto Scale...".format(len(result.items)))
+    MakeLog("Checking {} Resources for Auto Scale...".format(total_resources))
 
-    for resource in result.items:
+    for resource in result:
         # The search data is not always updated. Get the tags from the actual resource itself, not using the search data.
         resourceOk = False
         if cmd.print_ocid:
@@ -518,6 +543,7 @@ def autoscale_region(region):
             # - Anyday
             # - WeekDay or Weekend
             # - Name of Day (Monday, Tuesday....)
+            # - Name of Day, ending with a number to indicate Nth of the month (Saturday1, Saturday2)
             # - Day of month
 
             if AnyDay in schedule:
@@ -531,6 +557,9 @@ def autoscale_region(region):
 
             if Day in schedule:  # Check for day specific tag (today)
                 ActiveSchedule = schedule[Day]
+
+            if "{}{}".format(Day, DayNr) in schedule:  # Check for Nth day of the Month
+                ActiveSchedule = schedule["{}{}".format(Day, DayNr)]
 
             if DayOfMonth in schedule:
                 specificDays = schedule[DayOfMonth].split(",")
@@ -575,7 +604,7 @@ def autoscale_region(region):
 
                 MakeLog(" - Active schedule for {}: {}".format(resource.display_name, DisplaySchedule))
 
-                if schedulehours[CurrentHour] == "*":
+                if "*" in schedulehours[CurrentHour]:
                     MakeLog(" - Ignoring this service for this hour")
 
                 else:
@@ -1477,7 +1506,8 @@ parser.add_argument('-ec', default="", dest='compartment_exclude', help='Exclude
 parser.add_argument('-ignrtime', action='store_true', default=False, dest='ignore_region_time', help='Ignore Region Time - Use Host Time')
 parser.add_argument('-ignoremysql', action='store_true', default=False, dest='ignoremysql', help='Ignore MYSQL processing')
 parser.add_argument('-printocid', action='store_true', default=False, dest='print_ocid', help='Print OCID for resources')
-parser.add_argument('-topic', default="", dest='topic', help='Topic to send summary in home region')
+parser.add_argument('-topic', default="", dest='topic', help='Topic OCID to send summary in home region')
+parser.add_argument('-log', default="", dest='log', help='Log OCID to send log output to')
 
 cmd = parser.parse_args()
 if cmd.action != "All" and cmd.action != "Down" and cmd.action != "Up":
@@ -1609,3 +1639,24 @@ if cmd.topic:
                     Retry = False
 
 MakeLog("All scaling tasks done, checked {} resources.".format(total_resources))
+
+if cmd.log:
+    config['region'] = tenancy_home_region
+    signer.region = tenancy_home_region
+    logingest = oci.loggingingestion.LoggingClient(config, signer=signer)
+    logdetails.source = "Autoscale-script"
+    logdetails.type = "Autoscale-script-output"
+    logdetails.subject = "Autoscale operations"
+    logdetails.defaultlogentrytime = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    putlogdetails = oci.loggingingestion.models.PutLogsDetails()
+    putlogdetails.specversion = "1.0"
+    putlogdetails.log_entry_batches = [logdetails]
+
+    result = logingest.put_logs(log_id=cmd.log, put_logs_details=putlogdetails)
+
+
+
+
+
+
