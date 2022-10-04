@@ -98,6 +98,7 @@ Schedule.AnyDay : 0,0,0,0,0,0,0,0,\*,\*,\*,\*,\*,\*,\*,\*,0,0,0,0,0,0,0,0
 Comments can be added to the end of a schedule and start with `#`
 
 Schedule.AnyDay : 0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,\*,\*,\*,\*,\* #Ashburn
+
 Schedule.AnyDay : 0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,\*,\*,\*,\*,\*,0,0 #Phoenix
 
 ### Values for DayOfMonth tags
