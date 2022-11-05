@@ -4,9 +4,8 @@
 # Copyright (c) 2016, 2022, Oracle and/or its affiliates.  All rights reserved.
 # This software is licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
 #
-# Written by: Richard Garsthagen
-# Contributors: Joel Nation
-# Contributors: Adi Zohar
+# Created by: Richard Garsthagen
+# Contributors: Joel Nation, Adi Zohar, Dan Iverson, T-Srikanth, Christopher Johnson, Kyle Benson, Richard Benwell
 #################################################################################################################
 # Application Command line parameters
 #
@@ -45,7 +44,7 @@ AnyDay = "AnyDay"
 Weekend = "Weekend"
 WeekDay = "WeekDay"
 DayOfMonth = "DayOfMonth"
-Version = "2022.03.13"
+Version = "2022.11.05"
 
 # ============== CONFIGURE THIS SECTION ======================
 # OCI Configuration
@@ -493,45 +492,49 @@ def autoscale_region(region):
         else:
             MakeLog("Checking {} ({})...".format(resource.display_name, resource.resource_type))
 
-        if resource.resource_type == "Instance":
-            resourceDetails = compute.get_instance(instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "DbSystem":
-            resourceDetails = database.get_db_system(db_system_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "VmCluster":
-            resourceDetails = database.get_vm_cluster(vm_cluster_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "AutonomousDatabase":
-            resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "InstancePool":
-            resourceDetails = pool.get_instance_pool(instance_pool_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "OdaInstance":
-            resourceDetails = oda.get_oda_instance(oda_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "AnalyticsInstance":
-            resourceDetails = analytics.get_analytics_instance(analytics_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "IntegrationInstance":
-            resourceDetails = integration.get_integration_instance(integration_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "LoadBalancer":
-            resourceDetails = loadbalancer.get_load_balancer(load_balancer_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "MysqlDBInstance":
-            resourceDetails = mysql.get_db_system(db_system_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "GoldenGateDeployment":
-            resourceDetails = goldengate.get_deployment(deployment_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "DISWorkspace":
-            resourceDetails = dataintegration.get_workspace(workspace_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
-        if resource.resource_type == "VisualBuilderInstance":
-            resourceDetails = visualbuilder.get_vb_instance(vb_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
-            resourceOk = True
+        try:
+            if resource.resource_type == "Instance":
+                resourceDetails = compute.get_instance(instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "DbSystem":
+                resourceDetails = database.get_db_system(db_system_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "VmCluster":
+                resourceDetails = database.get_vm_cluster(vm_cluster_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "AutonomousDatabase":
+                resourceDetails = database.get_autonomous_database(autonomous_database_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "InstancePool":
+                resourceDetails = pool.get_instance_pool(instance_pool_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "OdaInstance":
+                resourceDetails = oda.get_oda_instance(oda_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "AnalyticsInstance":
+                resourceDetails = analytics.get_analytics_instance(analytics_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "IntegrationInstance":
+                resourceDetails = integration.get_integration_instance(integration_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "LoadBalancer":
+                resourceDetails = loadbalancer.get_load_balancer(load_balancer_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "MysqlDBInstance":
+                resourceDetails = mysql.get_db_system(db_system_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "GoldenGateDeployment":
+                resourceDetails = goldengate.get_deployment(deployment_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "DISWorkspace":
+                resourceDetails = dataintegration.get_workspace(workspace_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+            if resource.resource_type == "VisualBuilderInstance":
+                resourceDetails = visualbuilder.get_vb_instance(vb_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
+                resourceOk = True
+        except:
+            MakeLog("Skipping resource, information can not be found")
+            resourceOk = False
 
         if not isDeleted(resource.lifecycle_state) and resourceOk:
             schedule = resourceDetails.defined_tags[PredefinedTag]
@@ -612,45 +615,71 @@ def autoscale_region(region):
                     # Instance
                     ###################################################################################
                     if resource.resource_type == "Instance":
-                        if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
-                            # Only perform action if VM Instance, ignoring any BM instances.
-                            if resourceDetails.shape[:2] == "VM":
-                                if resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) == 0:
-                                    if Action == "All" or Action == "Down":
-                                        MakeLog(" - Initiate Compute VM shutdown for {}".format(resource.display_name))
-                                        Retry = True
-                                        while Retry:
-                                            try:
-                                                response = compute.instance_action(instance_id=resource.identifier, action=ComputeShutdownMethod)
-                                                Retry = False
-                                                success.append(" - Initiate Compute VM shutdown for {}".format(resource.display_name))
-                                            except oci.exceptions.ServiceError as response:
-                                                if response.status == 429:
-                                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
-                                                    time.sleep(RateLimitDelay)
-                                                else:
-                                                    ErrorsFound = True
-                                                    errors.append(" - Error ({}) Compute VM Shutdown for {} - {}".format(response.status, resource.display_name, response.message))
-                                                    MakeLog(" - Error ({}) Compute VM Shutdown for {} - {}".format(response.status, resource.display_name, response.message))
-                                                    Retry = False
+                        # Check if value is (CPU:Memory) value for flex shapes
+                        if schedulehours[CurrentHour][0] == "(" and schedulehours[CurrentHour][-1:] == ")":
+                            if "flex" in resourceDetails.shape.lower():
+                                cpu, memory = schedulehours[CurrentHour][1:-1].split(":")
+                                if float(cpu) != resourceDetails.shape_config.ocpus or float(memory) != resourceDetails.shape_config.memory_in_gbs:
+                                    MakeLog("Changing VM size")
+                                    changedetails = oci.core.models.UpdateInstanceDetails()
+                                    configdetails = oci.core.models.UpdateInstanceShapeConfigDetails()
+                                    configdetails.ocpus = float(cpu)
+                                    configdetails.memory_in_gbs = float(memory)
+                                    changedetails.shape_config = configdetails
+                                    try:
+                                        response = compute.update_instance(instance_id=resource.identifier, update_instance_details=changedetails)
+                                        MakeLog("Modifying flex shape. CPU count: {} - Memory {}".format(cpu, memory))
+                                    except oci.exceptions.ServiceError as response:
+                                        MakeLog("Can not modify shape: {}".format(response.message))
+                                else:
+                                    MakeLog("Ignoring schedule as VM is already in the desired state")
+                                # except:
+                                #     MakeLog("Incorrect schedule: {}".format(schedulehours[CurrentHour]))
 
-                                if resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
-                                    if Action == "All" or Action == "Up":
-                                        MakeLog(" - Initiate Compute VM startup for {}".format(resource.display_name))
-                                        Retry = True
-                                        while Retry:
-                                            try:
-                                                response = compute.instance_action(instance_id=resource.identifier, action="START")
-                                                Retry = False
-                                                success.append(" - Initiate Compute VM startup for {}".format(resource.display_name))
-                                            except oci.exceptions.ServiceError as response:
-                                                if response.status == 429:
-                                                    MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
-                                                    time.sleep(RateLimitDelay)
-                                                else:
-                                                    ErrorsFound = True
-                                                    errors.append(" - Error ({}) Compute VM startup for {} - {}".format(response.status, resource.display_name, response.message))
+                            else:
+                                MakeLog("Can not apply this modification {}, as shape is not a flex shape".format(schedulehours[CurrentHour]))
+
+                        else:
+                            if int(schedulehours[CurrentHour]) == 0 or int(schedulehours[CurrentHour]) == 1:
+                                # Only perform action if VM Instance, ignoring any BM instances.
+                                if resourceDetails.shape[:2] == "VM":
+                                    if resourceDetails.lifecycle_state == "RUNNING" and int(schedulehours[CurrentHour]) == 0:
+                                        if Action == "All" or Action == "Down":
+                                            MakeLog(" - Initiate Compute VM shutdown for {}".format(resource.display_name))
+                                            Retry = True
+                                            while Retry:
+                                                try:
+                                                    response = compute.instance_action(instance_id=resource.identifier, action=ComputeShutdownMethod)
                                                     Retry = False
+                                                    success.append(" - Initiate Compute VM shutdown for {}".format(resource.display_name))
+                                                except oci.exceptions.ServiceError as response:
+                                                    if response.status == 429:
+                                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                                        time.sleep(RateLimitDelay)
+                                                    else:
+                                                        ErrorsFound = True
+                                                        errors.append(" - Error ({}) Compute VM Shutdown for {} - {}".format(response.status, resource.display_name, response.message))
+                                                        MakeLog(" - Error ({}) Compute VM Shutdown for {} - {}".format(response.status, resource.display_name, response.message))
+                                                        Retry = False
+
+                                    if resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) == 1:
+                                        if Action == "All" or Action == "Up":
+                                            MakeLog(" - Initiate Compute VM startup for {}".format(resource.display_name))
+                                            Retry = True
+                                            while Retry:
+                                                try:
+                                                    response = compute.instance_action(instance_id=resource.identifier, action="START")
+                                                    Retry = False
+                                                    success.append(" - Initiate Compute VM startup for {}".format(resource.display_name))
+                                                except oci.exceptions.ServiceError as response:
+                                                    if response.status == 429:
+                                                        MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
+                                                        time.sleep(RateLimitDelay)
+                                                    else:
+                                                        ErrorsFound = True
+                                                        errors.append(" - Error ({}) Compute VM startup for {} - {}".format(response.status, resource.display_name, response.message))
+                                                        Retry = False
+
 
                     ###################################################################################
                     # DBSystem
