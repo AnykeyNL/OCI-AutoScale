@@ -128,6 +128,8 @@ If a value in the schedule is written as: (4:8) it will modify the CPU and Memor
 
 IMPORTANT: This will reboot the compute instance! 
 
+![Changing a Flex Shape](https://oc-blog.com/wp-content/uploads/2022/11/flex.png)
+
 
 ### Running the Script
 
