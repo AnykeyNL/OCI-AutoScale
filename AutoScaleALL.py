@@ -419,7 +419,6 @@ def autoscale_region(region):
                                                           **{
                                                               "limit": 1000
                                                           }).data
-
     except oci.exceptions.ServiceError as response:
         print ("Error: {} - {}".format(response.code, response.message))
         result = oci.resource_search.models.ResourceSummaryCollection()
@@ -470,7 +469,12 @@ def autoscale_region(region):
                 summary.lifecycle_state = mysql_instance.lifecycle_state
                 summary.display_name = mysql_instance.display_name
                 summary.resource_type = "MysqlDBInstance"
-                result.items.append(summary)
+
+                try:
+                   result.items.append(summary)
+                except AttributeError:
+                   result.append(summary)
+                
 
         MakeLog("")
 
