@@ -492,9 +492,9 @@ def autoscale_region(region):
         # The search data is not always updated. Get the tags from the actual resource itself, not using the search data.
         resourceOk = False
         if cmd.print_ocid:
-            MakeLog("Checking {} ({}) - {}...".format(resource.display_name, resource.resource_type, resource.identifier))
+            MakeLog("Checking {} ({}) - {}, CurrentState: {}...".format(resource.display_name, resource.resource_type, resource.identifier, resource.lifecycle_state))
         else:
-            MakeLog("Checking {} ({})...".format(resource.display_name, resource.resource_type))
+            MakeLog("Checking {} ({}) CurentState: {}...".format(resource.display_name, resource.resource_type, resource.lifecycle_state))
 
         try:
             if resource.resource_type == "Instance":
