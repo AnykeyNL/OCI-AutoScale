@@ -405,7 +405,7 @@ def autoscale_region(region):
     # Find all resources with a Schedule Tag
     ###############################################
     MakeLog("Getting all resources supported by the search function...")
-    query = "query all resources where (definedTags.namespace = '{}')".format(PredefinedTag)
+    query = "query {} resources where (definedTags.namespace = '{}')".format(', '.join(supported_resources), PredefinedTag)
     query += " && compartmentId  = '" + compartment_include + "'" if compartment_include else ""
     query += " && compartmentId != '" + compartment_exclude + "'" if compartment_exclude else ""
     sdetails = oci.resource_search.models.StructuredSearchDetails()
@@ -1606,6 +1606,20 @@ success = []
 errors = []
 total_resources = 0
 ErrorsFound = False
+supported_resources = [
+        "instance",
+        "instancepool",
+        "dbsystem",
+        "cloudexadatainfrastructure",
+        "autonomousdatabase",
+        "odainstance",
+        "analyticsinstance",
+        "integrationinstance",
+        "loadbalancer",
+        "goldengatedeployment",
+        "disworkspace",
+        "visualbuilderinstance"
+        ]
 
 ############################################
 # Loop on all regions
@@ -1687,9 +1701,4 @@ if cmd.log:
     putlogdetails.log_entry_batches = [logdetails]
 
     result = logingest.put_logs(log_id=cmd.log, put_logs_details=putlogdetails)
-
-
-
-
-
 
