@@ -457,7 +457,7 @@ def autoscale_region(region):
             MakeLog(".", True)
 
             for mysql_instance in mysql_instances:
-                if PredefinedTag not in mysql_instance.defined_tags or mysql_instance.lifecycle_state != "ACTIVE":
+                if PredefinedTag not in mysql_instance.defined_tags:
                     continue
 
                 summary = oci.resource_search.models.ResourceSummary()
