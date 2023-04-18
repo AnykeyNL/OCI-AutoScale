@@ -1610,6 +1610,7 @@ supported_resources = [
         "instance",
         "instancepool",
         "dbsystem",
+        "vmcluster",
         "cloudexadatainfrastructure",
         "autonomousdatabase",
         "odainstance",
