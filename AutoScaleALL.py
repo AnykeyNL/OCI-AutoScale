@@ -46,6 +46,7 @@ Weekend = "Weekend"
 WeekDay = "WeekDay"
 DayOfMonth = "DayOfMonth"
 Version = "2022.11.05"
+Override = "Override"
 
 # ============== CONFIGURE THIS SECTION ======================
 # OCI Configuration
