@@ -578,12 +578,13 @@ def autoscale_region(region):
                         ActiveSchedule = ("{},".format(schedulesize)*24)[:-1]
 
             if cmd.override:
-                ResourceOverrideTag = schedule[Override]
-                if cmd.override == "All" or cmd.override == ResourceOverrideTag:
-                    if cmd.action == "Up":
-                        ActiveSchedule = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"
-                    if cmd.action == "Down":
-                        ActiveSchedule = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+                if Override in schedule:
+                    ResourceOverrideTag = schedule[Override]
+                    if cmd.override == "All" or cmd.override == ResourceOverrideTag:
+                        if cmd.action == "Up":
+                            ActiveSchedule = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"
+                        if cmd.action == "Down":
+                            ActiveSchedule = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
             
             #################################################################
             # Check if the active schedule contains exactly 24 numbers for each hour of the day
