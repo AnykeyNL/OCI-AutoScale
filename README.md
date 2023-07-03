@@ -134,6 +134,8 @@ For example, you have the tag `Schedule.Override: labservers` set on instances, 
 python3 AutoScaleALL.py -a Up -override labservers
 ```
 
+Using the override feature, it will only do PowerOn (1) / PowerOff (0) actions, not rescale any resource.
+
 ### Changing the CPU and/or Memory Count of Compute Flex Shape
 If a value in the schedule is written as: (4:8) it will modify the CPU and Memory Count. The format should be (cpu:memory). 
 
