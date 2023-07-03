@@ -123,6 +123,16 @@ A specific Nth day of month schedule overwrites a normal day of the month schedu
 
 ![Power Off Example DB VM](https://oc-blog.com/wp-content/uploads/2019/06/ScaleExampleDB.png)
 
+### Override Tag
+
+There may times when you want to force a group of servers to start or stop outside a predefined schedule. This could be a group of lab servers used for training that you want to control ad-hoc. You can add a defined tag `Schedule.Override` with any value to the instances and reference them with the `-override` parameter. 
+
+For example, you have the tag `Schedule.Override: labservers` set on instances, you can start those instances using this command.
+
+```bash
+python3 AutoScaleALL.py -a Up -override labservers
+```
+
 ### Changing the CPU and/or Memory Count of Compute Flex Shape
 If a value in the schedule is written as: (4:8) it will modify the CPU and Memory Count. The format should be (cpu:memory). 
 

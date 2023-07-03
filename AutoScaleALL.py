@@ -22,6 +22,7 @@
 #   -printocid - print ocid of object
 #   -topic     - topic to sent summary
 #   -log       - send log output to OCI Logging service. Specify the Log OCID
+#   -ot        - override schedule based on a tag
 #   -h         - help
 #
 #################################################################################################################
@@ -45,6 +46,7 @@ Weekend = "Weekend"
 WeekDay = "WeekDay"
 DayOfMonth = "DayOfMonth"
 Version = "2022.11.05"
+Override = "Override"
 
 # ============== CONFIGURE THIS SECTION ======================
 # OCI Configuration
@@ -575,6 +577,15 @@ def autoscale_region(region):
                     if int(day) == CurrentDayOfMonth:
                         ActiveSchedule = ("{},".format(schedulesize)*24)[:-1]
 
+            if cmd.override:
+                if Override in schedule:
+                    ResourceOverrideTag = schedule[Override]
+                    if cmd.override == "All" or cmd.override == ResourceOverrideTag:
+                        if cmd.action == "Up":
+                            ActiveSchedule = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"
+                        if cmd.action == "Down":
+                            ActiveSchedule = "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+            
             #################################################################
             # Check if the active schedule contains exactly 24 numbers for each hour of the day
             #################################################################
@@ -1541,6 +1552,7 @@ parser.add_argument('-ignoremysql', action='store_true', default=False, dest='ig
 parser.add_argument('-printocid', action='store_true', default=False, dest='print_ocid', help='Print OCID for resources')
 parser.add_argument('-topic', default="", dest='topic', help='Topic OCID to send summary in home region')
 parser.add_argument('-log', default="", dest='log', help='Log OCID to send log output to')
+parser.add_argument('-override', default="", dest='override', help='Override schedule based on a tag')
 
 cmd = parser.parse_args()
 if cmd.action != "All" and cmd.action != "Down" and cmd.action != "Up":
