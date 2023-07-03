@@ -417,7 +417,7 @@ def autoscale_region(region):
         result = oci.pagination.list_call_get_all_results(search.search_resources,
                                                           sdetails,
                                                           **{
-                                                              "limit": 1000
+                                                              "limit": 10
                                                           }).data
     except oci.exceptions.ServiceError as response:
         print ("Error: {} - {}".format(response.code, response.message))
