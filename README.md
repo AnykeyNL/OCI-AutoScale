@@ -20,6 +20,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
    -rg        - Filter on Region
    -ic        - include compartment ocid
    -ec        - exclude compartment ocid
+   -override  - Override schedule based on a tag
    -ignrtime  - ignore region time zone (Use host time)
    -printocid - print ocid of resource
    -topic     - topic OCID to sent summary (in home region)
