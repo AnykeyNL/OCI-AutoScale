@@ -63,7 +63,7 @@ Also MySQL instances that are not running (Active state)) do not allow their tag
 # Install script into (free-tier) Autonomous Linux Instance
 Youtube demonstration video: https://youtu.be/veHbyvDB74A
 
-- Create a free-tier compute instance using the Autonomous Linux 7.8 image
+- Create a (free-tier) compute instance using the Autonomous Linux or Oracle Linux image
 - Create a Dynamic Group called Autoscaling and add the OCID of your instance to the group, using this command:
   - ANY {instance.id = 'your_OCID_of_your_Compute_Instance'}
 - Create a root level policy, giving your dynamic group permission to manage all resources in tenancy:
