@@ -38,6 +38,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Database VMs: On/Off
 - Database Baremetal Servers: Scaling (# of CPUs)
 - Database Exadata CS: Scaling (# of CPUs)*
+- Database Exadata VM Cluster: Scaling (# of CPUs)
 - Autonomous Databases: On/Off and Scaling (# of CPUs)
 - Oracle Digital Assistant: On/Off
 - Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
