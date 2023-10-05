@@ -539,7 +539,7 @@ def autoscale_region(region):
             if resource.resource_type == "VisualBuilderInstance":
                 resourceDetails = visualbuilder.get_vb_instance(vb_instance_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
                 resourceOk = True
-            if resource.resource_type == "cloudvmcluster":
+            if resource.resource_type == "CloudVmCluster":
                 resourceDetails = database.get_cloud_vm_cluster(cloud_vm_cluster_id=resource.identifier, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY).data
                 resourceOk = True
 
@@ -850,7 +850,7 @@ def autoscale_region(region):
                     ###################################################################################
                     # Exadata - VM Cluster
                     ###################################################################################
-                    if resource.resource_type == "cloudvmcluster":
+                    if resource.resource_type == "CloudVmCluster":
                         if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
                             if Action == "All" or Action == "Down":
                                 MakeLog(" - Initiate Exadata VM Cluster Scale Down from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
