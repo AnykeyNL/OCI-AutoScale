@@ -208,7 +208,10 @@ class AutonomousThread(threading.Thread):
             time.sleep(10)
         MakeLog("Autonomous DB {} started, re-scaling to {} cpus".format(self.NAME, self.CPU))
         dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
-        dbupdate.cpu_core_count = self.CPU
+        if response.data.compute_model == "OCPU":
+            dbupdate.cpu_core_count = self.CPU
+        if response.data.compute_model == "ECPU":
+            dbupdate.compute_count = self.CPU
 
         Retry = True
         while Retry:
@@ -951,47 +954,58 @@ def autoscale_region(region):
                         if int(schedulehours[CurrentHour]) >= 0 and int(schedulehours[CurrentHour]) < 129:
                             # Autonomous DB is running request is amount of CPU core change is needed
                             if resourceDetails.lifecycle_state == "AVAILABLE" and int(schedulehours[CurrentHour]) > 0:
-                                if resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]):
+                                if (resourceDetails.cpu_core_count > int(schedulehours[CurrentHour]) and resourceDetails.compute_model == "OCPU") or (resourceDetails.compute_count > int(schedulehours[CurrentHour]) and resourceDetails.compute_model == "ECPU"):
                                     if Action == "All" or Action == "Down":
-                                        MakeLog(" - Initiate Autonomous DB Scale Down to {} for {}".format(int(schedulehours[CurrentHour]),
-                                                                                                           resource.display_name))
                                         dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
-                                        dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
+                                        scalefrom = 0
+                                        if resourceDetails.compute_model == "ECPU":
+                                            scalefrom = int(resourceDetails.compute_count)
+                                            dbupdate.compute_count = int(schedulehours[CurrentHour])
+                                        if resourceDetails.compute_model == "OCPU":
+                                            scalefrom = int(resourceDetails.cpu_core_count)
+                                            dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
+                                        MakeLog(" - Initiate Autonomous DB Scale Down from {} to {} for {}".format(scalefrom, int(schedulehours[CurrentHour]), resource.display_name))
                                         Retry = True
                                         while Retry:
                                             try:
                                                 response = database.update_autonomous_database(autonomous_database_id=resource.identifier, update_autonomous_database_details=dbupdate)
                                                 Retry = False
-                                                success.append(" - Initiate Autonomous DB Scale Down from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
+                                                success.append(" - Initiate Autonomous DB Scale Down from {} to {} for {}".format(scalefrom, int(schedulehours[CurrentHour]), resource.display_name))
                                             except oci.exceptions.ServiceError as response:
                                                 if response.status == 429:
                                                     MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
                                                     time.sleep(RateLimitDelay)
                                                 else:
                                                     ErrorsFound = True
-                                                    errors.append(" - Error ({}) Autonomous DB Scale Down from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
-                                                    MakeLog(" - Error ({}) Autonomous DB Scale Down from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                    errors.append(" - Error ({}) Autonomous DB Scale Down from {} to {} for {} - {}".format(response.status, scalefrom, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                    MakeLog(" - Error ({}) Autonomous DB Scale Down from {} to {} for {} - {}".format(response.status, scalefrom, int(schedulehours[CurrentHour]), resource.display_name, response.message))
                                                     Retry = False
 
-                                if resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]):
+                                if (resourceDetails.cpu_core_count < int(schedulehours[CurrentHour]) and resourceDetails.compute_model == "OCPU") or (resourceDetails.compute_count < int(schedulehours[CurrentHour]) and resourceDetails.compute_model == "ECPU"):
                                     if Action == "All" or Action == "Up":
-                                        MakeLog(" - Initiate Autonomous DB Scale Up from {} to {} for {}".format(resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name))
                                         dbupdate = oci.database.models.UpdateAutonomousDatabaseDetails()
-                                        dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
+                                        scalefrom = 0
+                                        if resourceDetails.compute_model == "ECPU":
+                                            scalefrom = int(resourceDetails.compute_count)
+                                            dbupdate.compute_count = int(schedulehours[CurrentHour])
+                                        if resourceDetails.compute_model == "OCPU":
+                                            scalefrom = int(resourceDetails.cpu_core_count)
+                                            dbupdate.cpu_core_count = int(schedulehours[CurrentHour])
+                                        MakeLog(" - Initiate Autonomous DB Scale Up from {} to {} for {}".format(scalefrom, int(schedulehours[CurrentHour]), resource.display_name))
                                         Retry = True
                                         while Retry:
                                             try:
                                                 response = database.update_autonomous_database(autonomous_database_id=resource.identifier, update_autonomous_database_details=dbupdate)
                                                 Retry = False
-                                                success.append(" - Initiate Autonomous DB Scale Up to {} for {}".format(int(schedulehours[CurrentHour]), resource.display_name))
+                                                success.append(" - Initiate Autonomous DB Scale Up from {} to {} for {}".format(scalefrom ,int(schedulehours[CurrentHour]), resource.display_name))
                                             except oci.exceptions.ServiceError as response:
                                                 if response.status == 429:
                                                     MakeLog("Rate limit kicking in.. waiting {} seconds...".format(RateLimitDelay))
                                                     time.sleep(RateLimitDelay)
                                                 else:
                                                     ErrorsFound = True
-                                                    errors.append(" - Error ({}) Autonomous DB Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
-                                                    MakeLog(" - Error ({}) Autonomous DB Scale Up from {} to {} for {} - {}".format(response.status, resourceDetails.cpu_core_count, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                    errors.append(" - Error ({}) Autonomous DB Scale Up from {} to {} for {} - {}".format(response.status, scalefrom, int(schedulehours[CurrentHour]), resource.display_name, response.message))
+                                                    MakeLog(" - Error ({}) Autonomous DB Scale Up from {} to {} for {} - {}".format(response.status, scalefrom, int(schedulehours[CurrentHour]), resource.display_name, response.message))
                                                     Retry = False
 
                             # Autonomous DB is running request is to stop the database
@@ -1017,7 +1031,7 @@ def autoscale_region(region):
                             if resourceDetails.lifecycle_state == "STOPPED" and int(schedulehours[CurrentHour]) > 0:
                                 if Action == "All" or Action == "Up":
                                     # Autonomous DB is stopped and needs to be started with same amount of CPUs configured
-                                    if resourceDetails.cpu_core_count == int(schedulehours[CurrentHour]):
+                                    if (resourceDetails.cpu_core_count == int(schedulehours[CurrentHour]) and resourceDetails.compute_model == "OCPU") or ((resourceDetails.compute_count == int(schedulehours[CurrentHour]) and resourceDetails.compute_model == "ECPU") ):
                                         MakeLog(" - Starting Autonomous DB {}".format(resource.display_name))
                                         Retry = True
                                         while Retry:
@@ -1036,7 +1050,12 @@ def autoscale_region(region):
                                                     Retry = False
 
                                     # Autonomous DB is stopped and needs to be started, after that it requires CPU change
-                                    if resourceDetails.cpu_core_count != int(schedulehours[CurrentHour]):
+                                    scaleto = 0
+                                    if resourceDetails.compute_model == "ECPU":
+                                        scaleto = int(resourceDetails.compute_count)
+                                    if resourceDetails.compute_model == "OCPU":
+                                        scaleto = int(resourceDetails.cpu_core_count)
+                                    if scaleto != int(schedulehours[CurrentHour]):
                                         tcount = tcount + 1
                                         thread = AutonomousThread(tcount, resource.identifier, resource.display_name, int(schedulehours[CurrentHour]))
                                         thread.start()

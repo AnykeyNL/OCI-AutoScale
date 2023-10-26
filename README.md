@@ -5,6 +5,7 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW 
+- Support for Autonomous Database ECPU and OCPU models
 - Support for changing the CPU and Memory Count for Compute Flex Shapes (WILL REBOOT THE INSTANCE!!)
 - Support for Nth day of the Month Scheuld (Like 1st saturday or 3rd Saturday)
 - Support for a Day of the Month Schedule (Like 1st of the month or 15th of the month)
@@ -39,7 +40,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Database Baremetal Servers: Scaling (# of CPUs)
 - Database Exadata CS: Scaling (# of CPUs)*
 - Database Exadata VM Cluster: Scaling (# of CPUs)
-- Autonomous Databases: On/Off and Scaling (# of CPUs)
+- Autonomous Databases: On/Off and Scaling (# of CPUs) for both ECPU and OCPU models
 - Oracle Digital Assistant: On/Off
 - Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
 - Oracle Integration Service: On/Off
