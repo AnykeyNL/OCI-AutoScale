@@ -1,7 +1,7 @@
 #!/home/opc/py36env/bin/python
 #################################################################################################################
 # OCI - Scheduled Auto Scaling Script
-# Copyright (c) 2016, 2022, Oracle and/or its affiliates.  All rights reserved.
+# Copyright (c) 2016, 2024, Oracle and/or its affiliates.  All rights reserved.
 # This software is licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl
 #
 # Created by: Richard Garsthagen
@@ -45,7 +45,7 @@ AnyDay = "AnyDay"
 Weekend = "Weekend"
 WeekDay = "WeekDay"
 DayOfMonth = "DayOfMonth"
-Version = "2022.11.05"
+Version = "2024.01.09"
 Override = "Override"
 
 # ============== CONFIGURE THIS SECTION ======================
@@ -650,7 +650,7 @@ def autoscale_region(region):
                                     configdetails.memory_in_gbs = float(memory)
                                     changedetails.shape_config = configdetails
                                     try:
-                                        response = compute.update_instance(instance_id=resource.identifier, update_instance_details=changedetails)
+                                        response = compute.update_instance(instance_id=resource.identifier, update_instance_details=changedetails, retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
                                         MakeLog("Modifying flex shape. CPU count: {} - Memory {}".format(cpu, memory))
                                     except oci.exceptions.ServiceError as response:
                                         MakeLog("Can not modify shape: {}".format(response.message))
@@ -1371,7 +1371,9 @@ def autoscale_region(region):
                             shape = 400
                         if resourceDetails.shape_name == "8000Mbps":
                             shape = 8000
-                        if requestedShape == 10 or requestedShape == 100 or requestedShape == 400 or requestedShape == 8000:
+                        if resourceDetails.shape_name == "flexible":
+                            shape = resourceDetails.shape_details.maximum_bandwidth_in_mbps
+                        if (requestedShape == 10 or requestedShape == 100 or requestedShape == 400 or requestedShape == 8000) and resourceDetails.shape_name != "flexible":
                             if requestedShape < shape:
                                 if Action == "All" or Action == "Down":
                                     details = oci.load_balancer.models.UpdateLoadBalancerShapeDetails()
@@ -1382,7 +1384,7 @@ def autoscale_region(region):
                                                                                 retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
                                     except oci.exceptions.ServiceError as response:
                                         MakeLog(" - Error Downsizing: {}".format(response.message))
-                                        errors.append(" - Error ({}) Integration Service startup for {}".format(response.message, resource.display_name))
+                                        errors.append(" - Error ({}) Load Balancer sizing for {}".format(response.message, resource.display_name))
 
                             if requestedShape > shape:
                                 if Action == "All" or Action == "Up":
@@ -1394,8 +1396,46 @@ def autoscale_region(region):
                                                                                 retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
                                     except oci.exceptions.ServiceError as response:
                                         MakeLog(" - Error Upsizing: {} ".format(response.message))
-                                        errors.append(" - Error ({}) Integration Service startup for {}".format(response.message, resource.display_name))
-
+                                        errors.append(" - Error ({}) Load Balancer sizing for {}".format(response.message, resource.display_name))
+                        elif resourceDetails.shape_name == "flexible":
+                            if requestedShape < shape:
+                                if Action == "All" or Action == "Down":
+                                    details = oci.load_balancer.models.UpdateLoadBalancerShapeDetails()
+                                    flexdetails = oci.load_balancer.models.ShapeDetails()
+                                    flexdetails.minimum_bandwidth_in_mbps = resourceDetails.shape_details.minimum_bandwidth_in_mbps
+                                    flexdetails.maximum_bandwidth_in_mbps = requestedShape
+                                    details.shape_details = flexdetails
+                                    details.shape_name = resourceDetails.shape_name
+                                    MakeLog(" - Downsizing Flex loadbalancer from {} to {}".format(shape,requestedShape))
+                                    try:
+                                        loadbalancer.update_load_balancer_shape(load_balancer_id=resource.identifier,
+                                                                                update_load_balancer_shape_details=details,
+                                                                                retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
+                                    except oci.exceptions.ServiceError as response:
+                                        MakeLog(" - Error Downsizing: {}".format(response.message))
+                                        errors.append(" - Error ({}) Flex Load Balancer sizing for {}".format(response.message,
+                                                                                                         resource.display_name))
+                                else:
+                                    MakeLog(" - Ignoring size as this is smaller then current")
+                            if requestedShape > shape:
+                                if Action == "All" or Action == "Up":
+                                    details = oci.load_balancer.models.UpdateLoadBalancerShapeDetails()
+                                    flexdetails = oci.load_balancer.models.ShapeDetails()
+                                    flexdetails.minimum_bandwidth_in_mbps = resourceDetails.shape_details.minimum_bandwidth_in_mbps
+                                    flexdetails.maximum_bandwidth_in_mbps = requestedShape
+                                    details.shape_details = flexdetails
+                                    details.shape_name = resourceDetails.shape_name
+                                    MakeLog(" - Upsizing Flex loadbalancer from {} to {}".format(shape,requestedShape))
+                                    try:
+                                        loadbalancer.update_load_balancer_shape(load_balancer_id=resource.identifier,
+                                                                                update_load_balancer_shape_details=details,
+                                                                                retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY)
+                                    except oci.exceptions.ServiceError as response:
+                                        MakeLog(" - Error Upsizing: {}".format(response.message))
+                                        errors.append(" - Error ({}) Flex Load Balancer sizing for {}".format(response.message,
+                                                                                                         resource.display_name))
+                                else:
+                                    MakeLog(" - Ignoring size as this is larger then current")
                         else:
                             MakeLog(" - Error {}: requested shape {} does not exists".format(resource.display_name, requestedShape))
 

@@ -44,7 +44,8 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 - Oracle Digital Assistant: On/Off
 - Oracle Analytics Cloud: On/Off and Scaling (between 2-8 oCPU and 10-12 oCPU)
 - Oracle Integration Service: On/Off
-- Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)**
+- Dyamic Load Balancer: Scaling (between 10, 100, 400, 8000 Mbps)**
+- Flexible Load Balancer: Scaling the Max bandwidth to the given number
 - MySQL Service: On/Off***
 - GoldenGate: On/Off
 - Data Integration Workspaces: On/Off
