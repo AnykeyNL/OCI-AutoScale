@@ -5,12 +5,11 @@ Welcome to the Scheduled Auto Scaling Script for OCI (Oracle Cloud Infrastructur
 The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources that support scaling up/down and power on/off operations.
 
 # NEW 
+- Support for Flex Load Balancer shape, controlling the max bandwidth
 - Support for Autonomous Database ECPU and OCPU models
 - Support for changing the CPU and Memory Count for Compute Flex Shapes (WILL REBOOT THE INSTANCE!!)
 - Support for Nth day of the Month Scheuld (Like 1st saturday or 3rd Saturday)
 - Support for a Day of the Month Schedule (Like 1st of the month or 15th of the month)
-- Support running on all regions 
-- Added flags as parameters for execution:
 
 ```
    -t config  - Config file section to use (tenancy profile)
