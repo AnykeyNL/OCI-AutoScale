@@ -95,7 +95,8 @@ A single resource can contain multiple tags. The priority of tags is as followed
 - Day of the month (Example 1 = 1st or 15 = 15th of the month)
 
 ### Values for the AnyDay, Weekday, Weekend and Day of week tags:
-The value of the tag needs to contain 24 numbers and/or wildcards (*) (else it is ignored), separated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
+The value of the tag needs to contain 24 numbers and/or wildcards (*) (else it is ignored), separated by commas. If the value is 0 it will power off the resource (if that is supported for that resource). Any number higher then 0 will re-scale the resource to that number, 
+except for Flex Compute Shapes. To resize a Flex shape use the (cores:memory) notation. If the resource is powered off, it first will power-on the resource and then scale to the correct size.
 
 When a wild card is used, the service will stay unmodified for that hour. For example, the below schedule will turn of a compute instance in the evening/night, but allows the user to manage the state during the day.
 
