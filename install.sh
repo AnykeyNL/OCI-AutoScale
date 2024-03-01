@@ -7,6 +7,7 @@
 sudo timedatectl set-timezone Europe/Amsterdam
 
 # Install needed components and configure crontab with correct schedule
+sudo yum -y update
 sudo yum -y install git
 sudo pip3 install oci oci-cli
 git clone https://github.com/AnykeyNL/OCI-AutoScale.git
