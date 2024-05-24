@@ -7,6 +7,7 @@ The **AutoScaleALL** script: A single Auto Scaling script for all OCI resources 
 # NEW - NATIVE OCI SUPPORT FOR AUTOSCHEDULING COMPUTE AND AUTONOMOUS DATABASE
 If you are looking to schedule compute, base database and/or autonomous database resources, you no longer need this script! You can use the new 
 resource schedular service in OCI
+
 https://docs.oracle.com/en-us/iaas/Content/resource-scheduler/home.htm
 
 
