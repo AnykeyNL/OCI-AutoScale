@@ -6,10 +6,21 @@ import os
 # Input - config_profile and is_instance_principals and is_delegation_token
 # Output - config and signer objects
 ##########################################################################
-def create_signer(config_profile, is_instance_principals, is_delegation_token):
+def create_signer(config_profile, is_resource_principals, is_instance_principals, is_delegation_token):
+    
+    # if resource principals authentications
+    if is_resource_principals:
+        try:
+            signer = oci.auth.signers.get_resource_principals_signer()
+            config = {'region': signer.region, 'tenancy': signer.tenancy_id}
+            return config, signer
+
+        except Exception:
+            print_header("Error obtaining resource principals certificate, aborting")
+            raise SystemExit
 
     # if instance principals authentications
-    if is_instance_principals:
+    elif is_instance_principals:
         try:
             signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
             config = {'region': signer.region, 'tenancy': signer.tenancy_id}
