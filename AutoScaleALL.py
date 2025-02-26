@@ -551,7 +551,12 @@ def autoscale_region(region):
             resourceOk = False
 
         if not isDeleted(resource.lifecycle_state) and resourceOk:
-            schedule = resourceDetails.defined_tags[PredefinedTag]
+            try:
+                schedule = resourceDetails.defined_tags[PredefinedTag]
+            except:
+                MakeLog("Error getting schedule tag from this resource")
+                schedule = ""
+
             ActiveSchedule = ""
 
             # Checking the right schedule based on priority
